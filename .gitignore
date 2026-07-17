@@ -1,0 +1,7 @@
+# Never commit secrets or machine-local noise.
+*.log
+.DS_Store
+
+# If you add token-bearing files, ignore them explicitly and template instead:
+# .npmrc.local
+# .env
