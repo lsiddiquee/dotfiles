@@ -8,8 +8,9 @@
 #
 # Philosophy: idempotent and non-destructive. Every step checks before it writes,
 # so re-running (or a partial previous run) never duplicates lines or clobbers
-# existing config. A single optional step must not abort the whole install.
-set -uo pipefail
+# existing config. Failures are loud: the script aborts rather than silently
+# leaving the environment half-configured.
+set -euo pipefail
 
 echo "==> dotfiles: starting install for $(whoami)"
 
@@ -34,6 +35,56 @@ ensure_line() {
 
 echo "==> npmrc: ensuring the package-feed proxy registry"
 ensure_line "${HOME}/.npmrc" "registry=https://packagefeedproxy.microsoft.io/npm/"
+
+# ---------------------------------------------------------------------------
+# Copilot skills — cloned under $HOME, which is wiped on every dev container
+# rebuild. Kept as real git clones so `git pull` picks up upstream changes; do
+# not edit the working trees in place or the next pull will conflict.
+# ---------------------------------------------------------------------------
+require_cmd() {
+  # require_cmd <name> — abort with a clear message if <name> is not on PATH.
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "ERROR: required command '$1' not found on PATH" >&2
+    exit 1
+  fi
+}
+
+require_cmd git
+require_cmd python3
+
+COPILOT_SKILLS_DIR="${HOME}/.copilot/skills"
+REMOVE_FLUFF_DIR="${COPILOT_SKILLS_DIR}/remove-fluff"
+REMOVE_FLUFF_REPO="https://github.com/iharshulhan/remove-fluff.git"
+
+echo "==> copilot skill: remove-fluff"
+if [[ -d "${REMOVE_FLUFF_DIR}/.git" ]]; then
+  echo "    updating existing clone at ${REMOVE_FLUFF_DIR}"
+  git -C "${REMOVE_FLUFF_DIR}" pull --ff-only
+else
+  echo "    cloning ${REMOVE_FLUFF_REPO}"
+  mkdir -p "${COPILOT_SKILLS_DIR}"
+  git clone "${REMOVE_FLUFF_REPO}" "${REMOVE_FLUFF_DIR}"
+fi
+
+if ! python3 -m pip --version >/dev/null 2>&1; then
+  # Some base images ship python3 without pip; ensurepip is stdlib-bundled.
+  echo "    bootstrapping pip"
+  if ! python3 -m ensurepip --user; then
+    echo "ERROR: python3 has no pip and ensurepip could not bootstrap it." >&2
+    echo "       Install pip for this interpreter (Debian/Ubuntu: apt install python3-pip) and re-run." >&2
+    exit 1
+  fi
+fi
+
+echo "    installing python dependencies"
+python3 -m pip install --user -r "${REMOVE_FLUFF_DIR}/requirements.txt"
+
+echo "    verifying scorer"
+if ! python3 "${REMOVE_FLUFF_DIR}/scripts/svi.py" --help >/dev/null; then
+  echo "ERROR: ${REMOVE_FLUFF_DIR}/scripts/svi.py --help failed" >&2
+  exit 1
+fi
+echo "    ok: remove-fluff ready at ${REMOVE_FLUFF_DIR}"
 
 # ---------------------------------------------------------------------------
 # Add more personal setup below (git config, aliases, shell rc, etc.). Keep each
