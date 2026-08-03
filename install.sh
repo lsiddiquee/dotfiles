@@ -37,9 +37,10 @@ echo "==> npmrc: ensuring the package-feed proxy registry"
 ensure_line "${HOME}/.npmrc" "registry=https://packagefeedproxy.microsoft.io/npm/"
 
 # ---------------------------------------------------------------------------
-# Copilot skills — cloned under $HOME, which is wiped on every dev container
-# rebuild. Kept as real git clones so `git pull` picks up upstream changes; do
-# not edit the working trees in place or the next pull will conflict.
+# Copilot skills — installed under $HOME, which is wiped on every dev container
+# rebuild. Skills authored in this repo are symlinked; third-party skills are
+# real git clones, so do not edit their working trees in place or the next pull
+# will conflict.
 # ---------------------------------------------------------------------------
 require_cmd() {
   # require_cmd <name> — abort with a clear message if <name> is not on PATH.
@@ -49,10 +50,58 @@ require_cmd() {
   fi
 }
 
+COPILOT_SKILLS_DIR="${HOME}/.copilot/skills"
+
+# ---------------------------------------------------------------------------
+# Custom Copilot skills — authored in this repo under skills/ and symlinked into
+# ~/.copilot/skills so edits in the repo take effect without re-running this
+# script. Each skills/<name>/ directory must contain a SKILL.md. Linked before
+# the third-party skills below so a failure there can't block your own.
+# ---------------------------------------------------------------------------
+DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CUSTOM_SKILLS_SRC="${DOTFILES_DIR}/skills"
+
+echo "==> copilot skills: custom (${CUSTOM_SKILLS_SRC})"
+if [[ ! -d "${CUSTOM_SKILLS_SRC}" ]]; then
+  echo "    none: ${CUSTOM_SKILLS_SRC} does not exist, skipping"
+else
+  mkdir -p "${COPILOT_SKILLS_DIR}"
+  shopt -s nullglob
+  for skill_src in "${CUSTOM_SKILLS_SRC}"/*/; do
+    skill_src="${skill_src%/}"
+    skill_name="$(basename "${skill_src}")"
+    skill_dest="${COPILOT_SKILLS_DIR}/${skill_name}"
+
+    if [[ ! -f "${skill_src}/SKILL.md" ]]; then
+      echo "ERROR: ${skill_src} has no SKILL.md; a skill directory must define one" >&2
+      exit 1
+    fi
+
+    if [[ -L "${skill_dest}" ]]; then
+      current="$(readlink -f "${skill_dest}" || true)"
+      if [[ "${current}" == "${skill_src}" ]]; then
+        echo "    ok: ${skill_name} already linked"
+        continue
+      fi
+      echo "    relinking ${skill_name} (was -> ${current:-<broken>})"
+      rm "${skill_dest}"
+    elif [[ -e "${skill_dest}" ]]; then
+      echo "ERROR: ${skill_dest} exists and is not a symlink; move or remove it and re-run" >&2
+      exit 1
+    fi
+
+    ln -s "${skill_src}" "${skill_dest}"
+    echo "    linked: ${skill_name} -> ${skill_src}"
+  done
+  shopt -u nullglob
+fi
+
+# ---------------------------------------------------------------------------
+# Third-party Copilot skills.
+# ---------------------------------------------------------------------------
 require_cmd git
 require_cmd python3
 
-COPILOT_SKILLS_DIR="${HOME}/.copilot/skills"
 REMOVE_FLUFF_DIR="${COPILOT_SKILLS_DIR}/remove-fluff"
 REMOVE_FLUFF_REPO="https://github.com/iharshulhan/remove-fluff.git"
 

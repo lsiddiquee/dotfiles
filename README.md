@@ -14,6 +14,13 @@ the install loudly instead of leaving a half-configured environment.
   package-feed proxy to your user `~/.npmrc`. This is intentionally kept in your
   *personal* environment, never in a project repo, so project builds default to
   the public npm registry for anyone who can't reach the internal proxy.
+- **Custom Copilot skills** — every directory under [`skills/`](skills/) is
+  symlinked into `~/.copilot/skills/`, so editing a skill in this repo takes
+  effect immediately; only adding or renaming one needs a re-run. Each directory
+  must contain a `SKILL.md` or the install aborts. See
+  [`skills/README.md`](skills/README.md) for the authoring format. This step
+  runs *before* the third-party skills below, so a failure there can't stop your
+  own skills from being installed.
 - **`remove-fluff` Copilot skill** — clones
   [iharshulhan/remove-fluff](https://github.com/iharshulhan/remove-fluff) (MIT)
   to `~/.copilot/skills/remove-fluff` and installs its `requirements.txt`
