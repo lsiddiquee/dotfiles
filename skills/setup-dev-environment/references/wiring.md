@@ -14,7 +14,8 @@ Pin the major; let patches float.
 | Azure CLI | `ghcr.io/devcontainers/features/azure-cli:1` |
 | GitHub CLI | `ghcr.io/devcontainers/features/github-cli:1` |
 | uv | `ghcr.io/va-h/devcontainers-features/uv:1` |
-| Container builds / Testcontainers | `ghcr.io/devcontainers/features/docker-in-docker:3` |
+| Container builds / Testcontainers | `ghcr.io/devcontainers/features/docker-in-docker:4` |
+| Docker where the host daemon can be reused | `ghcr.io/devcontainers/features/docker-outside-of-docker:1` |
 
 `go-task` lives under `devcontainers-extra`, not `devcontainers`.
 

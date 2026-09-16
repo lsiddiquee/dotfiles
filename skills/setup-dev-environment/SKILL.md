@@ -34,8 +34,15 @@ Before writing `image`, `build`, or any apt step, run the probe in [Base image s
 This applies equally to feature versions, tool availability, and the default user: `remoteUser` is `vscode` on
 `devcontainers/python`, `node` on `devcontainers/typescript-node`.
 
-If Docker is unavailable on the host, say so and mark every image-dependent line as unverified rather than
-guessing.
+**When Docker is unreachable, stop and name the fix.** Never fall back to validating on the host: host tool
+versions prove nothing about the image, and that failure is silent.
+
+| Where you are running | Fix to state |
+| --------------------- | ------------ |
+| Inside a dev container | Add `docker-outside-of-docker` to reuse the host daemon, or `docker-in-docker` for a nested one, then rebuild. IDs in [references/wiring.md](references/wiring.md#feature-ids) |
+| Anywhere else | Re-run from the host or WSL, where the daemon is reachable |
+
+Until one of those holds, mark every image-dependent line unverified rather than guessing.
 
 ## Procedure
 
@@ -338,8 +345,8 @@ so the container, the host and CI cannot drift.
 | `dev:setup` | Everything a fresh container needs; called by post-create |
 | `hooks` | Install the git hooks; called by `dev:setup` |
 
-`install` must use the frozen form (`pnpm install --frozen-lockfile`, `uv pip sync`, `npm ci` where the cache is
-not at stake), and must cover **every** manifest inventory found. If a manifest has no install path, the container
+`install` must use the frozen form (`pnpm install --frozen-lockfile`, `uv sync --frozen`, `npm ci` where the cache
+is not at stake), and must cover **every** manifest inventory found. If a manifest has no install path, the container
 comes up clean and that project is unbuildable. `check` is the command a contributor runs before pushing and the
 command CI runs.
 

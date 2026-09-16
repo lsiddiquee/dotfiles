@@ -115,23 +115,37 @@ else
   git clone "${REMOVE_FLUFF_REPO}" "${REMOVE_FLUFF_DIR}"
 fi
 
-if ! python3 -m pip --version >/dev/null 2>&1; then
-  # Some base images ship python3 without pip; ensurepip is stdlib-bundled.
-  echo "    bootstrapping pip"
-  if ! python3 -m ensurepip --user; then
-    echo "ERROR: python3 has no pip and ensurepip could not bootstrap it." >&2
-    echo "       Install pip for this interpreter (Debian/Ubuntu: apt install python3-pip) and re-run." >&2
+# The skill's docs invoke the scorer as bare `python3 scripts/svi.py`, so its
+# dependencies must be visible to the system interpreter — a venv would not be.
+# Some distros already satisfy them via apt (e.g. python3-markdown-it).
+if python3 "${REMOVE_FLUFF_DIR}/scripts/svi.py" --help >/dev/null 2>&1; then
+  echo "    ok: scorer already runnable, leaving python packages alone"
+else
+  if ! python3 -m pip --version >/dev/null 2>&1; then
+    # Some base images ship python3 without pip; ensurepip is stdlib-bundled.
+    echo "    bootstrapping pip"
+    if ! python3 -m ensurepip --user; then
+      echo "ERROR: python3 has no pip and ensurepip could not bootstrap it." >&2
+      echo "       Install pip for this interpreter (Debian/Ubuntu: apt install python3-pip) and re-run." >&2
+      exit 1
+    fi
+  fi
+
+  pip_args=(--user)
+  if ls /usr/lib/python3*/EXTERNALLY-MANAGED >/dev/null 2>&1; then
+    # PEP 668 refuses user-site installs without this; the deps are pinned and
+    # pure-Python, so they cannot disturb apt-managed packages.
+    pip_args+=(--break-system-packages)
+  fi
+
+  echo "    installing python dependencies"
+  python3 -m pip install "${pip_args[@]}" -r "${REMOVE_FLUFF_DIR}/requirements.txt"
+
+  echo "    verifying scorer"
+  if ! python3 "${REMOVE_FLUFF_DIR}/scripts/svi.py" --help >/dev/null; then
+    echo "ERROR: ${REMOVE_FLUFF_DIR}/scripts/svi.py --help failed" >&2
     exit 1
   fi
-fi
-
-echo "    installing python dependencies"
-python3 -m pip install --user -r "${REMOVE_FLUFF_DIR}/requirements.txt"
-
-echo "    verifying scorer"
-if ! python3 "${REMOVE_FLUFF_DIR}/scripts/svi.py" --help >/dev/null; then
-  echo "ERROR: ${REMOVE_FLUFF_DIR}/scripts/svi.py --help failed" >&2
-  exit 1
 fi
 echo "    ok: remove-fluff ready at ${REMOVE_FLUFF_DIR}"
 
