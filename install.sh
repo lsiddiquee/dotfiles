@@ -53,10 +53,10 @@ require_cmd() {
 COPILOT_SKILLS_DIR="${HOME}/.copilot/skills"
 
 # ---------------------------------------------------------------------------
-# Custom Copilot skills — authored in this repo under skills/ and symlinked into
-# ~/.copilot/skills so edits in the repo take effect without re-running this
-# script. Each skills/<name>/ directory must contain a SKILL.md. Linked before
-# the third-party skills below so a failure there can't block your own.
+# Custom Copilot skills — symlinked from skills/ into ~/.copilot/skills. The
+# link resolves to wherever this script ran from: your own working tree when run
+# by hand, or VS Code's throwaway dotfiles clone inside a container. Linked
+# before the third-party skills below so a failure there can't block your own.
 # ---------------------------------------------------------------------------
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CUSTOM_SKILLS_SRC="${DOTFILES_DIR}/skills"
