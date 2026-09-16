@@ -99,6 +99,10 @@ Read, do not guess:
 - Any service the app talks to locally (database, cache, queue). This is the only trigger for Compose.
 - Whether any port is pinned by an external system (identity-provider redirect URI, webhook callback).
 
+In patch mode, diff this inventory against what the container already declares. A manifest with no matching
+feature, cache variable or install path is a **missing** finding; a feature or cache variable with no matching
+manifest is **divergent**. A container that builds cleanly can still be months behind the repo's stack.
+
 ### 2. Choose and probe the base image
 
 Apply [Base image selection](#base-image-selection). Probe the chosen tag before committing to it.
@@ -166,6 +170,8 @@ What to ask about, once the audit is done:
 | Guarded post-create | Convert to strict, so failures surface instead of being swallowed? List every step that would become fatal. | **Yes**, so those steps fail at create time instead of silently |
 | No cache volume | Add it? Every rebuild currently re-downloads all dependencies. | Yes |
 | Manager present, cache var absent | Point it at the cache volume? | Yes |
+| Manifest for a language the container does not provide | Add the feature and its cache var? Name the manifest that proves the language is used. | Yes |
+| Feature or cache var for a language no longer in the repo | Remove it? Every rebuild currently pays for it. | Ask, since a script you cannot see may still call it |
 | Newer image or feature major exists | Bump? | **No**, since it is not broken and costs everyone a rebuild |
 | Unexplained line | What does this do? Keeping it until you say otherwise. | Keep |
 

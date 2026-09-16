@@ -31,14 +31,20 @@ So: the container must build before any task, lint rule or hook is validated. Th
 
 ### Phase 0. Scope
 
-Determine which phases are needed before starting:
+Phase 1 runs in every case except an explicit decision to have no container. What varies is whether it authors or
+audits:
 
 | Repo state | Phases |
 | ---------- | ------ |
-| No `.devcontainer/` and no `Taskfile.yml` | Both, in order |
-| `.devcontainer/` exists, no task surface | Phase 2 only, after confirming the container builds |
-| Both exist | Both, in audit mode |
+| Neither `.devcontainer/` nor `Taskfile.yml` | Both; phase 1 authors |
+| `.devcontainer/` exists, no task surface | Both; phase 1 audits |
+| Both exist | Both; phase 1 audits |
 | Container explicitly not wanted | Phase 2 only; say that validation is host-bound and therefore weaker |
+
+**A container that builds can still be wrong.** The repo's stack moves underneath it: a language added since the
+container was written has no feature, no cache variable and no install path, and a language removed leaves both
+behind. Never skip phase 1 on the grounds that a container already exists. Reconcile what it declares against
+current inventory first, and treat any divergence as a phase 1 finding.
 
 State the plan and the phases you are about to run before running them.
 
