@@ -126,6 +126,34 @@ and the command CI runs.
 For a monorepo, keep sub-project tasks in their own `Taskfile.yml` and pull them in with `includes:` plus `dir:`,
 so tools that resolve config by walking up from a file still find the right one.
 
+### Python environments
+
+A virtual environment is still wanted inside the container. It keeps the repo's dependencies off the system
+interpreter, which some base images mark externally-managed, and it gives the VS Code Python extension a concrete
+interpreter path to resolve against.
+
+**Keep it in the project, at `.venv`.** Every tool path in this skill assumes that location, and both managers can
+be made to agree on it:
+
+| Manager | Setting | Why |
+| ------- | ------- | --- |
+| uv | None needed; `.venv` in the project root is the default | Set `UV_PROJECT_ENVIRONMENT` only to move it elsewhere |
+| Poetry | `POETRY_VIRTUALENVS_IN_PROJECT: "true"` in `remoteEnv` | Its default is `{cache-dir}/virtualenvs`, outside the project entirely |
+
+The Poetry setting is load-bearing. Without it the venv lands in the cache directory, `.venv/bin/ruff` resolves to
+nothing, and the editor points at an interpreter no hook or CI step uses. Setting it later does not migrate an
+environment that already exists: the one under `{cache-dir}/virtualenvs` has to be deleted first, or Poetry keeps
+using it.
+
+**Do not mount a volume over `.venv`.** It sits in the bind-mounted workspace and already survives rebuilds. A
+volume there comes up root-owned, cannot be seeded from the Dockerfile because the workspace bind masks the
+image's directory at that path, is invisible from the host, and is named per repo, so a second clone silently
+gets a different one.
+
+**A venv built on the host cannot run in the container.** `pyvenv.cfg` and every console-script shebang record an
+absolute interpreter path. Have `dev:setup` detect a foreign venv and recreate it rather than reuse it, or the
+first `task check` fails on a missing interpreter with nothing pointing at the cause.
+
 ### Single-sourced lint configuration
 
 The editor, the hooks and CI must reach the same verdict. They diverge the moment a rule is stated in two places:
@@ -213,6 +241,7 @@ in the container.
 | `install` contents | Every manifest found, with the frozen form its manager provides |
 | `check` contents | The test and lint commands already in the manifests |
 | `fix` contents | The formatter and the linter's autofix mode, in that order |
+| Python manager | Whichever lockfile is present; for a repo with none, offer uv |
 | Hook framework | Whichever is already present; otherwise Python present means `pre-commit`, Node-only means `husky` |
 | Hook contents | `task fix`, so the hook cannot invoke anything different from CI |
 | Editor settings | Which configured tool handles which language, never the rules themselves |

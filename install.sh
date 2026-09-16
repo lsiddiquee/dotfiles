@@ -50,6 +50,22 @@ require_cmd() {
   fi
 }
 
+prune_stale_links() {
+  # prune_stale_links <dir> <src_root> — drop links into <src_root> whose source is gone,
+  # which is what a renamed skill leaves behind. Links elsewhere are left alone.
+  local dir="$1" src_root="$2" link
+  [[ -d "${dir}" ]] || return 0
+  shopt -s nullglob
+  for link in "${dir}"/*; do
+    [[ -L "${link}" ]] || continue
+    [[ "$(readlink "${link}")" == "${src_root}"/* ]] || continue
+    [[ -e "${link}" ]] && continue
+    rm "${link}"
+    echo "    pruned: $(basename "${link}") (source no longer in this repo)"
+  done
+  shopt -u nullglob
+}
+
 COPILOT_SKILLS_DIR="${HOME}/.copilot/skills"
 
 # ---------------------------------------------------------------------------
@@ -66,6 +82,7 @@ if [[ ! -d "${CUSTOM_SKILLS_SRC}" ]]; then
   echo "    none: ${CUSTOM_SKILLS_SRC} does not exist, skipping"
 else
   mkdir -p "${COPILOT_SKILLS_DIR}"
+  prune_stale_links "${COPILOT_SKILLS_DIR}" "${CUSTOM_SKILLS_SRC}"
   shopt -s nullglob
   for skill_src in "${CUSTOM_SKILLS_SRC}"/*/; do
     skill_src="${skill_src%/}"
@@ -114,6 +131,7 @@ if [[ ! -d "${CUSTOM_AGENTS_SRC}" ]]; then
   echo "    none: ${CUSTOM_AGENTS_SRC} does not exist, skipping"
 else
   mkdir -p "${COPILOT_AGENTS_DIR}"
+  prune_stale_links "${COPILOT_AGENTS_DIR}" "${CUSTOM_AGENTS_SRC}"
   shopt -s nullglob
   for agent_src in "${CUSTOM_AGENTS_SRC}"/*.agent.md; do
     agent_name="$(basename "${agent_src}")"

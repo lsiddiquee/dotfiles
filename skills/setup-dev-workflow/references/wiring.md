@@ -14,6 +14,16 @@ Route work to tools without restating their rules.
 }}}
 ```
 
+With Python present, add the interpreter path so the extension resolves the repo's own environment rather than the
+system one:
+
+```jsonc
+"python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python"
+```
+
+Point it wherever the venv was placed. A path that does not exist leaves the extension silently falling back to
+the system interpreter.
+
 ## Hook staging
 
 ```yaml

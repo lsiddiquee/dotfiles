@@ -44,55 +44,6 @@ a run.
 Run the agent against one greenfield repo and one existing repo. `taxa` and `CloakCode` are both candidates and
 both already have known defects to find.
 
-## `install.sh` leaves dangling symlinks behind
-
-**Recorded 2026-09-16. Open.**
-
-The skills loop adds and relinks, and never removes. Renaming `setup-dev-environment` to `setup-devcontainer` left
-`~/.copilot/skills/setup-dev-environment` pointing at a path that no longer exists, and the next run reported
-success while the broken link sat there. It was removed by hand.
-
-Only the host is affected, since `~/.copilot` is recreated on every container build.
-
-### Shape of the fix
-
-Sweep `~/.copilot/skills` and `~/.copilot/agents` for symlinks that resolve into this repo and no longer have a
-source, and remove those. Roughly six lines. Restrict it to links pointing into the dotfiles tree so that
-unrelated skills are never touched.
-
-## Python environments
-
-**Recorded 2026-09-16. Open.**
-
-The container skill detects Python dependency managers but never decides how their environments are created or
-where they live. `.venv/` appears twice, both incidental: once in the list of artifacts expected after a build,
-once as the tool path `.venv/bin/ruff` in the workflow skill. A project-root `.venv` is assumed, never chosen.
-
-### Why it matters
-
-uv creates `.venv` in the working directory, which is the bind-mounted workspace. A `.venv` built on the host
-carries host interpreter paths in `pyvenv.cfg` and in every script shebang, so the container inherits a broken
-environment through the mount. Same failure class as validating tool versions on the host rather than in the
-container.
-
-### What is missing
-
-- **Manager choice for a greenfield Python repo.** The skill reads lockfile identity when one exists and
-  prescribes nothing when none does.
-- **Venv location.** Three viable answers, none chosen:
-  - keep `.venv` in the workspace under an anonymous volume, as with `node_modules`
-  - move it out of the workspace with `UV_PROJECT_ENVIRONMENT`
-  - keep it in the workspace and forbid host-side `uv sync`
-- **Poetry knobs.** No `POETRY_VIRTUALENVS_IN_PROJECT` or `POETRY_VIRTUALENVS_PATH` in the cache-variable table.
-- **Interpreter discovery.** No `python.defaultInterpreterPath` in the editor settings, without which VS Code
-  cannot find a relocated interpreter.
-
-### Shape of the fix
-
-A `### Python environments` subsection under Container baseline, roughly 15-20 lines, plus a row in the container
-skill's cache-variable table. The `.venv/bin/ruff` tool-path rule in the workflow skill should keep pointing at
-whatever location is chosen.
-
 ## The shared patching rubric depends on symlinks
 
 **Recorded 2026-09-16. Open, low priority.**

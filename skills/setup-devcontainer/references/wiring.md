@@ -30,7 +30,7 @@ Emit only the rows whose tooling the repo actually contains.
 | npm / `package-lock.json` | `NPM_CONFIG_CACHE: /.devcontainercache/npm-cache` |
 | pnpm / `pnpm-lock.yaml` | `PNPM_HOME`, `PNPM_STORE_DIR`, `COREPACK_HOME` |
 | pip / `requirements.txt` | `PIP_CACHE_DIR: /.devcontainercache/pip-cache` |
-| Poetry / `poetry.lock` | `POETRY_CACHE_DIR: /.devcontainercache/poetry-cache` |
+| Poetry / `poetry.lock` | `POETRY_CACHE_DIR: /.devcontainercache/poetry-cache`, `POETRY_VIRTUALENVS_IN_PROJECT: "true"` |
 | uv / `uv.lock` | `UV_CACHE_DIR`, `UV_LINK_MODE: copy`, `UV_PYTHON_INSTALL_DIR`, `UV_TOOL_DIR`, `UV_TOOL_BIN_DIR`, and `PATH` prepended with `/.devcontainercache/uv-tools/bin` |
 | .NET / `*.csproj` | `NUGET_PACKAGES: /.devcontainercache/nuget-packages` |
 | Playwright | `PLAYWRIGHT_BROWSERS_PATH: /.devcontainercache/ms-playwright` |
