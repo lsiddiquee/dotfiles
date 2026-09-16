@@ -84,20 +84,3 @@ Under Compose, Docker will not create an external volume on demand, so create it
 ```jsonc
 "initializeCommand": "docker volume inspect <repo>-vscode-server >/dev/null 2>&1 || docker volume create <repo>-vscode-server >/dev/null"
 ```
-
-## Editor settings
-
-```jsonc
-"customizations": { "vscode": { "settings": {
-  "editor.formatOnSave": true,
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
-  "editor.codeActionsOnSave": { "source.fixAll": "explicit" }
-}}}
-```
-
-## Hook staging
-
-```yaml
-default_install_hook_types: [pre-commit, commit-msg]
-default_stages: [pre-commit]
-```

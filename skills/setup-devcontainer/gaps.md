@@ -32,6 +32,6 @@ container.
 
 ### Shape of the fix
 
-A `### Python environments` subsection under Environment baseline, roughly 15-20 lines, plus a row in
-[references/wiring.md](references/wiring.md#cache-environment-variables). Fits the container half of the skill, so
-it does not conflict with the devcontainer-first restructure.
+A `### Python environments` subsection under Container baseline, roughly 15-20 lines, plus a row in
+[references/wiring.md](references/wiring.md#cache-environment-variables). The `.venv/bin/ruff` tool-path rule
+lives in the `setup-dev-workflow` skill and should keep pointing at whatever location is chosen here.

@@ -72,6 +72,11 @@ else
     skill_name="$(basename "${skill_src}")"
     skill_dest="${COPILOT_SKILLS_DIR}/${skill_name}"
 
+    # _-prefixed directories hold files shared between skills, not skills.
+    if [[ "${skill_name}" == _* ]]; then
+      continue
+    fi
+
     if [[ ! -f "${skill_src}/SKILL.md" ]]; then
       echo "ERROR: ${skill_src} has no SKILL.md; a skill directory must define one" >&2
       exit 1
@@ -92,6 +97,43 @@ else
 
     ln -s "${skill_src}" "${skill_dest}"
     echo "    linked: ${skill_name} -> ${skill_src}"
+  done
+  shopt -u nullglob
+fi
+
+# ---------------------------------------------------------------------------
+# Custom Copilot agents — one .agent.md per file, symlinked into ~/.copilot/agents.
+# Agents exist to order skills, which are independently invocable and never call
+# each other.
+# ---------------------------------------------------------------------------
+COPILOT_AGENTS_DIR="${HOME}/.copilot/agents"
+CUSTOM_AGENTS_SRC="${DOTFILES_DIR}/agents"
+
+echo "==> copilot agents: custom (${CUSTOM_AGENTS_SRC})"
+if [[ ! -d "${CUSTOM_AGENTS_SRC}" ]]; then
+  echo "    none: ${CUSTOM_AGENTS_SRC} does not exist, skipping"
+else
+  mkdir -p "${COPILOT_AGENTS_DIR}"
+  shopt -s nullglob
+  for agent_src in "${CUSTOM_AGENTS_SRC}"/*.agent.md; do
+    agent_name="$(basename "${agent_src}")"
+    agent_dest="${COPILOT_AGENTS_DIR}/${agent_name}"
+
+    if [[ -L "${agent_dest}" ]]; then
+      current="$(readlink -f "${agent_dest}" || true)"
+      if [[ "${current}" == "${agent_src}" ]]; then
+        echo "    ok: ${agent_name} already linked"
+        continue
+      fi
+      echo "    relinking ${agent_name} (was -> ${current:-<broken>})"
+      rm "${agent_dest}"
+    elif [[ -e "${agent_dest}" ]]; then
+      echo "ERROR: ${agent_dest} exists and is not a symlink; move or remove it and re-run" >&2
+      exit 1
+    fi
+
+    ln -s "${agent_src}" "${agent_dest}"
+    echo "    linked: ${agent_name} -> ${agent_src}"
   done
   shopt -u nullglob
 fi
