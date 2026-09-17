@@ -35,7 +35,15 @@ Emit only the rows whose tooling the repo actually contains.
 | .NET / `*.csproj` | `NUGET_PACKAGES: /.devcontainercache/nuget-packages` |
 | Playwright | `PLAYWRIGHT_BROWSERS_PATH: /.devcontainercache/ms-playwright` |
 | Azure CLI feature | `AZURE_CONFIG_DIR: /.devcontainercache/.azure` |
+| GitHub CLI installed (feature or image) | `GH_CONFIG_DIR: /.devcontainercache/gh` |
 | `.pre-commit-config.yaml` | `PRE_COMMIT_HOME: /.devcontainercache/pre-commit` |
+
+`GH_CONFIG_DIR` persists GitHub CLI configuration and file-backed credentials across rebuilds. Create it as the
+remote user with mode `0700`. GitHub CLI prefers the system credential store; that store is separate from this
+directory. Do not force `--insecure-storage` to make persistence work. Preserve injected `GH_TOKEN` /
+`GITHUB_TOKEN` authentication without writing tokens into configuration. After login, verify with `gh auth status`
+before and after a rebuild, without `--show-token` or reading credential files. If authentication uses a
+nonpersistent credential store, report that limitation instead of claiming the directory alone preserves login.
 
 ## Baseline apt layer
 
