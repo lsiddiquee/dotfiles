@@ -98,6 +98,7 @@ Read, do not guess:
 - Any hook framework already present, since `pre-commit` needs Python in the image and its own cache variable.
 - Any service the app talks to locally (database, cache, queue). This is the only trigger for Compose.
 - Whether any port is pinned by an external system (identity-provider redirect URI, webhook callback).
+- For .NET, `UserSecretsId`, local secret provisioning, and the actual remote user's secret-store path and mounts.
 
 In patch mode, diff this inventory against what the container already declares. A manifest with no matching
 feature, cache variable or install path is a **missing** finding; a feature or cache variable with no matching
@@ -146,6 +147,8 @@ Report which of these you ran and which you could not.
 - Post-create is strict, with no speculative steps.
 - The Dockerfile holds only create-invariant setup.
 - `remoteUser` and the `chown` target match the probed image.
+- If .NET user-secrets are used, their dedicated store survives recreation, has restricted access, and required
+  local settings are provisioned without exposing values. Report any recreation check not performed.
 - `devcontainer-lock.json` committed after the build.
 
 ## Asking the user
@@ -245,6 +248,29 @@ workspace, and uv falls back with a warning on every install otherwise.
 
 `history -a` flushes after each command so history reaches the volume before a rebuild rather than at shell exit.
 
+#### .NET user-secrets persistence
+
+When the repo uses .NET user-secrets, persist **only the secret-store directory**, not the whole home directory.
+Package caches do not preserve it automatically. Use a dedicated, repo-scoped named volume at the actual remote
+user's store path; keep existing volume identities when patching. All project `UserSecretsId` directories beneath
+that store survive together. Do not share the volume across unrelated repositories unless explicitly requested.
+
+Restrict access to the remote user and preserve unrelated keys when provisioning required settings. User-secrets
+are plaintext development configuration, not an encrypted vault. Never bake their contents into an image, commit
+them, print them, or use `dotnet user-secrets list` as validation output.
+
+Before first applying the mount, check for an existing store: the new mount will hide it. Preserve it privately
+outside the repo and restore it into the mounted volume, or explicitly confirm it is absent. Recreating a container
+and deleting a volume are different operations; document which destructive volume commands remove this store.
+
+Required local settings must be restored **before** interactive cloud login or dependency installs can interrupt
+setup. Require their inputs and propagate failures; do not silently skip a missing database credential. Where
+Compose and project setup need the same value, resolve it once in Compose and supply it to both consumers rather
+than duplicating an independently hardcoded `remoteEnv` value.
+
+Wiring and execution-based verification:
+[references/wiring.md](references/wiring.md#net-user-secrets-store).
+
 ### Ports
 
 Two cases:
@@ -307,7 +333,7 @@ This governs scripts you write. For an existing guarded script, see
 Order. With ownership seeded and apt baked into the image, the script is short:
 
 1. `task dev:setup`, so dependency install and hook registration live in the Taskfile and the host and CI run the
-   same path.
+   same path. Its required local configuration provisioning precedes interactive login and dependency restores.
 2. Echo resolved versions of the tools that define the environment. Record them for debugging.
 
 A repo that kept its post-create chown per [Volume ownership](#volume-ownership) does that first.

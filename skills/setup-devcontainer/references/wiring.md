@@ -45,6 +45,31 @@ directory. Do not force `--insecure-storage` to make persistence work. Preserve 
 before and after a rebuild, without `--show-token` or reading credential files. If authentication uses a
 nonpersistent credential store, report that limitation instead of claiming the directory alone preserves login.
 
+## .NET user-secrets store
+
+For Linux .NET projects using user-secrets, add a dedicated mount at the verified user's store path
+(normally `$HOME/.microsoft/usersecrets`). This is separate from `NUGET_PACKAGES`.
+
+```jsonc
+"mounts": [
+  "source=dotnet-usersecrets-<repo>,target=/home/<remoteUser>/.microsoft/usersecrets,type=volume"
+]
+```
+
+Add this entry to existing mounts, not in place of the cache/editor volumes. With Compose, declare the named volume
+and mount it on the devcontainer service instead; do not introduce Compose just for persistence. Do not mount the
+entire home directory. Prepare ownership for the probed remote UID/GID, directory mode `0700`, and a restrictive
+umask when creating secret files. Never put actual credentials in Dockerfile ownership-seeding steps.
+
+For an existing store, preserve its contents before a first mount can hide them. Provision individual required keys
+with the project's existing setup command; never replace the entire store or erase other project IDs.
+
+Validate through execution: confirm ownership/access and required-key presence without displaying values, then use
+a fresh non-secret probe key to verify persistence across container recreation and remove that probe afterwards.
+Exercise the consuming application too: a healthy HTTP listener does not prove database-backed sign-in works.
+If recreation or application validation was not performed, report it as unverified; do not substitute tests that
+assert script/configuration contents.
+
 ## Baseline apt layer
 
 One transaction, lists dropped in the same layer:
