@@ -252,8 +252,9 @@ reinstate it.
 ### Engineering discipline
 
 - **TDD for behaviour changes.** For code behaviour, write the failing test first, then the minimal code that passes
-  it, then refactor. Pure docs, standalone scripts, config-only changes, or explicit throwaway spikes are exempt
-  unless the user says otherwise. Scripts and configuration follow execution-based validation under Testing.
+  it, then refactor. Pure docs, standalone scripts, configuration, prompts, response schemas and other declarative
+  text, or explicit throwaway spikes are exempt unless the user says otherwise. Scripts and declarative text follow
+  execution-based validation under Testing.
 - **YAGNI.** Smallest thing that ships the current slice. While work is unreleased, prefer a clean break over a
   compatibility shim or dual path.
 - **DRY on the third instance.** First stays local; second is compared; third stable copy earns a shared abstraction
@@ -266,11 +267,13 @@ reinstate it.
 
 ### Testing
 
-- **Standalone scripts and configuration:** do not create dedicated unit-test harnesses for them or tests asserting
-  their contents. Run scripts in the intended environment and check outcomes/exit status; validate configuration
-  with its tooling and consuming system. Syntax checks are supplementary, not proof of runtime correctness.
-  Report execution not performed. Genuine shared functions may have behaviour-focused unit tests; do not extract
-  helpers merely to justify tests. This exception does not waive application behaviour tests. (confirmed)
+- **Standalone scripts and declarative text** (configuration, pipeline/task wiring, prompts, response schemas, docs):
+  do not create tests that copy a value, sentence or structure from a file and assert it is still there. Run scripts
+  in the intended environment and check outcomes/exit status; validate configuration with its tooling and consuming
+  system; prove prompt and schema behaviour with a trial run or evaluation harness against the real consumer. Syntax
+  checks are supplementary, not proof of runtime correctness. Report execution not performed. Accidental omission is
+  review's job. Genuine shared functions may have behaviour-focused unit tests; do not extract helpers merely to
+  justify tests. This exception does not waive application behaviour tests. (confirmed)
 - While iterating, run the narrowest check that proves the point, not the whole suite by default.
 - **Never delete or weaken a test to make a change pass.**
 - Cover failure paths, not only the happy path.
@@ -282,8 +285,9 @@ reinstate it.
 Use as the authoritative closing checklist. Keep one line per item. Omit an item only when it cannot apply to the
 repository yet; do not leave dangling references.
 
-1. For application/shared-code behaviour: failing test first; success and failure paths covered. Pure docs and
-   explicit throwaway spikes are exempt; standalone scripts/configuration use execution-based validation instead.
+1. For application/shared-code behaviour: failing test first; success and failure paths covered. Pure docs, standalone
+   scripts, configuration, prompts, response schemas and other declarative text, or explicit throwaway spikes are
+   exempt; standalone scripts and declarative text use execution-based validation instead.
 2. Relevant fix/test/check commands are clean, or the hook runner reports nothing modified. If no runner exists yet,
    say what was run manually.
 3. No new warning, deprecation, or suppression introduced.
