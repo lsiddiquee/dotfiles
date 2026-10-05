@@ -45,6 +45,95 @@ directory. Do not force `--insecure-storage` to make persistence work. Preserve 
 before and after a rebuild, without `--show-token` or reading credential files. If authentication uses a
 nonpersistent credential store, report that limitation instead of claiming the directory alone preserves login.
 
+## Package registry and feed forwarding
+
+Forward only the endpoint inputs used by manifests or retained features. Feature installers count even without a
+matching project manifest: for example, Python `installTools: true` invokes pip, and Node feature global packages
+can invoke npm. `NPM_CONFIG_REGISTRY` also needs verification with pnpm/Corepack when retained. `PIP_INDEX_URL`
+does not by itself prove that Poetry uses the selected source; preserve and validate Poetry's project source
+configuration rather than assuming pip's setting controls it.
+
+Pass host values as non-secret endpoint URLs, with no host-side fallback. Declare only the relevant arguments:
+
+```jsonc
+"build": {
+  "dockerfile": "Dockerfile",
+  "args": {
+    // Keep only entries used by manifests or retained feature installers.
+    "NPM_CONFIG_REGISTRY": "${localEnv:NPM_CONFIG_REGISTRY}",
+    "PIP_INDEX_URL": "${localEnv:PIP_INDEX_URL}",
+    "NUGET_SOURCE": "${localEnv:NUGET_SOURCE}"
+  }
+}
+```
+
+Declare the same arguments in the Dockerfile before feature installation. Let unset or empty npm and pip overrides
+fall back to their normal public defaults; emit only variables relevant to the repo or retained features.
+`UV_DEFAULT_INDEX` is needed when uv is used and must follow `PIP_INDEX_URL`.
+
+```dockerfile
+# Keep only arguments and ENV entries relevant to this repo or its retained features.
+ARG NPM_CONFIG_REGISTRY
+ARG PIP_INDEX_URL
+ARG NUGET_SOURCE
+ENV NPM_CONFIG_REGISTRY=${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org/} \
+    PIP_INDEX_URL=${PIP_INDEX_URL:-https://pypi.org/simple} \
+    NUGET_SOURCE=${NUGET_SOURCE} \
+    RestoreSources=${NUGET_SOURCE}
+# Add only when uv is used:
+ENV UV_DEFAULT_INDEX=${PIP_INDEX_URL:-https://pypi.org/simple}
+```
+
+Use image `ENV`, not `remoteEnv` alone: build-time feature installers need the selected endpoint too. With no
+`NUGET_SOURCE`, leave normal NuGet source configuration intact. With an override, configure both MSBuild's
+`RestoreSources` and the probed remote user's NuGet client config, after `dotnet` is available in the relevant
+Dockerfile stage. Run that step as root, then restore the Dockerfile's intended `USER`. For a new client config, a
+source-only setup can be bootstrapped as follows; substitute the verified user and group, and do not overwrite an
+existing config:
+
+If the SDK is supplied only by a Dev Container Feature installed after Dockerfile instructions, do not place this
+step earlier and claim it succeeded. Use an SDK base image or a later setup hook that runs after the SDK and before
+any dependent build-time installer; otherwise report build-time NuGet coverage as unverified.
+
+```dockerfile
+RUN if [ -n "${NUGET_SOURCE}" ]; then \
+        set -eu; \
+        command -v dotnet >/dev/null; \
+        config=/home/<remoteUser>/.nuget/NuGet/NuGet.Config; \
+        mkdir -p "$(dirname "$config")"; \
+        if [ -e "$config" ]; then \
+            echo "Existing NuGet.Config requires review; refusing to overwrite" >&2; \
+            exit 1; \
+        fi; \
+        printf '%s\n' \
+            '<?xml version="1.0" encoding="utf-8"?>' \
+            '<configuration>' \
+            '  <packageSources>' \
+            '    <clear />' \
+            '  </packageSources>' \
+            '</configuration>' > "$config"; \
+        dotnet nuget add source "${NUGET_SOURCE}" --name environment \
+            --configfile "$config" >/dev/null; \
+        dotnet nuget list source --configfile "$config" --format Short \
+            > /tmp/nuget-sources; \
+        test "$(grep -c '^E ' /tmp/nuget-sources)" -eq 1; \
+        rm /tmp/nuget-sources; \
+        chown -R <remoteUser>:<remoteGroup> "$(dirname "$(dirname "$config")")"; \
+    fi
+```
+
+The source-count check is only a bootstrap check, not proof of effective isolation. Preserve existing configuration,
+package source mappings, and required `auditSources`; inspect effective sources from the workspace and relevant
+project directories because repository and nested `NuGet.Config` files can add or change sources. Verify in the
+unset-host trial that an empty `RestoreSources` value preserves normal sources; if the selected SDK treats it as an
+override, arrange for the property to be absent when `NUGET_SOURCE` is empty. Verify an MSBuild
+restore (including package audit) and non-MSBuild search, add/update, and tool operations against the approved feed;
+use a disposable project or tool manifest for operations that modify files. If an override cannot retain required
+audit coverage or an existing config needs a policy decision, stop and report it rather than silently clearing or
+bypassing configuration. Never put credentials, credential-bearing URLs, or host config files in build args, `ENV`,
+image layers, or logs; use supported credential providers or secret delivery for authenticated feeds.
+`NUGET_PACKAGES` is a cache path, not a source override.
+
 ## .NET user-secrets store
 
 For Linux .NET projects using user-secrets, add a dedicated mount at the verified user's store path
