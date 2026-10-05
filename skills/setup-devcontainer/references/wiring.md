@@ -98,15 +98,17 @@ repository configs and audit sources do not unexpectedly contact nuget.org or an
 isolation conflicts with required mappings or audit coverage, stop and report the conflict rather than silently
 deleting or weakening configuration.
 
-For a verified fresh user config (or one whose required contents have been deliberately merged), the conditional
-configuration step can follow this pattern. Run it only after the .NET feature/SDK is installed, and substitute the
-probed remote user's home, username, and group:
+For a verified fresh user config that does not already exist, the conditional configuration step can follow this
+pattern. Run it only after the .NET feature/SDK is installed, and substitute the probed remote user's home,
+username, and group. If a config already exists, preserve and merge it deliberately instead of applying this
+clear-and-recreate pattern:
 
 ```dockerfile
 RUN set -eu; \
     if [ -n "${NUGET_SOURCE}" ]; then \
         config="/home/<remoteUser>/.nuget/NuGet/NuGet.Config"; \
         mkdir -p "$(dirname "$config")"; \
+        test ! -e "$config"; \
         printf '%s\n' \
             '<?xml version="1.0" encoding="utf-8"?>' \
             '<configuration>' \
