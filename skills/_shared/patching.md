@@ -12,12 +12,18 @@ Report findings before editing. Sort every gap into one of four classes:
 
 | Class | Meaning | Action |
 | ----- | ------- | ------ |
-| **Broken** | Demonstrably fails: an `apt-get update` error, a cache var pointing at a path that is not mounted, a task that exits non-zero | Fix, and show the command that proves it was broken |
+| **Broken** | Demonstrably fails: an `apt-get update` error, a cache var pointing at a path that is not mounted, a task that exits non-zero, or a verified installer ignoring its required host feed override | Fix, and show the command that proves it was broken |
 | **Missing** | A baseline element is absent | Propose, with the cost of not having it |
 | **Divergent** | Works, but differs from the baseline | Ask, with the consequence of each answer spelled out; never silently convert |
 | **Unexplained** | You cannot derive why it exists | Keep it. Ask. |
 
 Only the **broken** class may be edited without asking.
+
+For dev containers, inventory installers invoked by retained features as well as project manifests. Record which
+build-time installers and runtime commands consume each relevant host registry/feed override; a feature such as
+Python `installTools: true` still counts when the repo has no Python manifest. For NuGet, inspect effective
+workspace and nested-project sources, source mappings, and `auditSources`; a user-level source list alone does not
+prove repository operations are isolated. Preserve existing NuGet configuration and required audit coverage.
 
 ## Ask once, after the audit
 
