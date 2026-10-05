@@ -17,8 +17,8 @@ by running a command inside it. Base images change without notice.
 
 The post-create script calls `task dev:setup`. Defining that task surface and the lint configuration is out of
 scope here. When a package manager serializes a host-specific private proxy into a lockfile, require a
-manager-aware staged-lockfile hook to prevent that endpoint being committed; do not blindly strip URLs or damage
-lockfile integrity.
+manager-aware pre-commit hook to reject or safely normalize that staged lockfile before the endpoint is committed;
+do not blindly strip URLs or damage lockfile integrity.
 
 ## How to read this file
 
@@ -159,8 +159,8 @@ Report which of these you ran and which you could not.
   runtime commands see the same selected endpoints.
 - NuGet restore and non-MSBuild operations use the intended feed, and effective workspace sources and audit sources
   have been checked without discarding required source mappings or audit coverage.
-- Lockfiles do not commit a host-private proxy URL; any staged-lockfile hook was exercised with a representative
-  lockfile and preserves package integrity.
+- Lockfiles do not commit a host-private proxy URL; any staged-lockfile pre-commit hook was exercised with a
+  representative lockfile and preserves package integrity.
 - Post-create is strict, with no speculative steps.
 - The Dockerfile holds only create-invariant setup.
 - `remoteUser` and the `chown` target match the probed image.

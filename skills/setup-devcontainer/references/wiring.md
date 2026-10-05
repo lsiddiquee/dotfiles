@@ -129,7 +129,8 @@ config or where source mappings/audit sources need preservation. Its source-coun
 not the effective workspace configuration.
 
 An override can be persisted into manager lockfiles. Inspect the resulting lockfiles; if they contain a host-private
-proxy URL, use the repository's existing hook framework for a manager-aware staged-lockfile check/normalizer.
+proxy URL, use the repository's existing hook framework for a manager-aware staged-lockfile pre-commit
+check/normalizer.
 Reject or safely normalize such changes before commit, preserving integrity hashes and intentional private-feed
 references. Do not use blanket URL deletion or rewriting. Verify the hook against a representative lockfile change.
 

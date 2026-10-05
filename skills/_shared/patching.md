@@ -28,8 +28,8 @@ host-private endpoints. A user-level NuGet source-count check alone is not proof
 Treat missing forwarding as **missing**, not broken. Treat an existing source, mapping, or audit configuration as
 load-bearing until its effect is understood. Ask before changing it; never silently replace user configuration,
 remove source mappings or weaken audit coverage. Where a feed override is serialized into lockfiles, use an
-existing manager-aware hook to prevent host-private URLs being committed, and verify that it preserves lockfile
-integrity rather than deleting URLs generically.
+existing manager-aware pre-commit hook to prevent host-private URLs being committed, and verify that it preserves
+lockfile integrity rather than deleting URLs generically.
 
 ## Ask once, after the audit
 
