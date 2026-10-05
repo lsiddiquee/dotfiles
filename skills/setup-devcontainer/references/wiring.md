@@ -45,6 +45,102 @@ directory. Do not force `--insecure-storage` to make persistence work. Preserve 
 before and after a rebuild, without `--show-token` or reading credential files. If authentication uses a
 nonpersistent credential store, report that limitation instead of claiming the directory alone preserves login.
 
+## Registry and feed forwarding
+
+Forward only the managers used by repository projects or package installers invoked by retained features. Feature
+installers count even without a corresponding manifest (for example, Python `installTools: true`). Registry values
+are non-secret endpoint URLs; never pass credentials, credential-bearing host configuration, or tokens through build
+args, image `ENV`, or build logs.
+
+Add only relevant entries to `build.args`:
+
+```jsonc
+"build": {
+  "dockerfile": "Dockerfile",
+  "args": {
+    "NPM_CONFIG_REGISTRY": "${localEnv:NPM_CONFIG_REGISTRY:https://registry.npmjs.org/}",
+    "PIP_INDEX_URL": "${localEnv:PIP_INDEX_URL:https://pypi.org/simple}",
+    "NUGET_SOURCE": "${localEnv:NUGET_SOURCE:}"
+  }
+}
+```
+
+Declare corresponding Dockerfile args and set image environment before any retained feature installer that may use
+them. This makes the selected endpoints available to build-time installers and runtime commands; `remoteEnv` alone
+is too late for feature builds. Include only relevant variables:
+
+```dockerfile
+ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org/
+ARG PIP_INDEX_URL=https://pypi.org/simple
+ARG NUGET_SOURCE=
+ENV NPM_CONFIG_REGISTRY=${NPM_CONFIG_REGISTRY} \
+    PIP_INDEX_URL=${PIP_INDEX_URL} \
+    NUGET_SOURCE=${NUGET_SOURCE} \
+    RestoreSources=${NUGET_SOURCE}
+```
+
+When uv is used or explicitly requested, also set `UV_DEFAULT_INDEX=${PIP_INDEX_URL}` in the image environment
+(declare the Dockerfile `ENV` entry alongside the others) so uv consumes the same selected Python index.
+
+For NuGet, `RestoreSources` is needed for MSBuild restore, but it does not configure search, add/update, or other
+NuGet client operations. When `NUGET_SOURCE` is non-empty, configure the remote user's NuGet client as well, in a
+stage where `dotnet` is available, using the probed remote user's home. Add the endpoint without credentials and
+make every configuration/assertion command fatal (`set -eu` or `&&` throughout); a later successful `chown` must
+not mask a failed source addition. With no override, do not create or replace NuGet configuration.
+
+Do not blindly overwrite an existing user `NuGet.Config`. Preserve unrelated settings, required source mappings,
+and audit coverage. If an explicit override requires a managed config with cleared package sources, first verify
+that no existing user settings or source mappings would be lost; preserve or merge them deliberately. Repository
+`NuGet.Config` files are discovered later in the config hierarchy and can add/clear sources, map packages, or
+declare separate `auditSources`. Inspect the effective configuration from the workspace and the solution/project
+directories. Do not claim the feed is isolated just because the user-level config lists one source: make sure
+repository configs and audit sources do not unexpectedly contact nuget.org or another unapproved endpoint. If
+isolation conflicts with required mappings or audit coverage, stop and report the conflict rather than silently
+deleting or weakening configuration.
+
+For a verified fresh user config that does not already exist, the conditional configuration step can follow this
+pattern. Run it only after the .NET feature/SDK is installed, and substitute the probed remote user's home,
+username, and group. If a config already exists, preserve and merge it deliberately instead of applying this
+clear-and-recreate pattern:
+
+```dockerfile
+RUN set -eu; \
+    if [ -n "${NUGET_SOURCE}" ]; then \
+        config="/home/<remoteUser>/.nuget/NuGet/NuGet.Config"; \
+        mkdir -p "$(dirname "$config")"; \
+        test ! -e "$config"; \
+        printf '%s\n' \
+            '<?xml version="1.0" encoding="utf-8"?>' \
+            '<configuration>' \
+            '  <packageSources>' \
+            '    <clear />' \
+            '  </packageSources>' \
+            '</configuration>' > "$config"; \
+        dotnet nuget add source "${NUGET_SOURCE}" --name environment --configfile "$config" >/dev/null; \
+        enabled_sources="$(dotnet nuget list source --configfile "$config" --format Short \
+            | awk '/^E / { count++ } END { print count+0 }')"; \
+        [ "$enabled_sources" -eq 1 ]; \
+        chown -R <remoteUser>:<remoteGroup> "/home/<remoteUser>/.nuget"; \
+    fi
+```
+
+The clear-and-add example is not a general-purpose merge strategy; do not apply it over an unexplained existing
+config or where source mappings/audit sources need preservation. Its source-count check verifies only this config,
+not the effective workspace configuration.
+
+An override can be persisted into manager lockfiles. Inspect the resulting lockfiles; if they contain a host-private
+proxy URL, use the repository's existing hook framework for a manager-aware staged-lockfile pre-commit
+check/normalizer.
+Reject or safely normalize such changes before commit, preserving integrity hashes and intentional private-feed
+references. Do not use blanket URL deletion or rewriting. Verify the hook against a representative lockfile change.
+
+Validate with actual consumers, not config-string assertions: run relevant feature installers and project package
+operations in the built container, and check both build-time and runtime endpoint consumption with overrides set
+and unset. For .NET, exercise restore/audit and relevant non-MSBuild operations (package search, add/update, or
+tool install) from the workspace, and inspect effective package and audit sources without exposing credentials.
+Report unreachable feeds and authentication-dependent checks as unverified; do not weaken TLS or silently switch
+registries to make a trial pass.
+
 ## .NET user-secrets store
 
 For Linux .NET projects using user-secrets, add a dedicated mount at the verified user's store path

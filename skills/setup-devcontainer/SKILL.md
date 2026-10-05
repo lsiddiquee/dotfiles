@@ -15,8 +15,10 @@ This skill has two jobs:
 The container must come up identically from a clean clone on any host, and every claim about it must be verified
 by running a command inside it. Base images change without notice.
 
-The post-create script calls `task dev:setup`. Defining that task surface, the lint configuration and the git
-hooks is out of scope here.
+The post-create script calls `task dev:setup`. Defining that task surface and the lint configuration is out of
+scope here. When a package manager serializes a host-specific private proxy into a lockfile, require a
+manager-aware pre-commit hook to reject or safely normalize that staged lockfile before the endpoint is committed;
+do not blindly strip URLs or damage lockfile integrity.
 
 ## How to read this file
 
@@ -92,9 +94,13 @@ If the repo already has a `.devcontainer/`, you are in **patch mode** rather tha
 Read, do not guess:
 
 - Manifests and lockfiles: `package.json`, `pyproject.toml`, `*.csproj`, `go.mod`, `Cargo.toml`, and their locks.
-  These name the stack and the package manager.
+  These name the stack and the package manager. Also inventory package installers run by every retained feature,
+  including optional feature settings such as Python `installTools: true`; those installs count even without a
+  matching project manifest.
 - Lockfile identity: `pnpm-lock.yaml` vs `package-lock.json` vs `yarn.lock`; `uv.lock` vs `poetry.lock` vs
   `requirements.txt`. The cache wiring differs per manager.
+- Existing package-manager registry settings and lockfile URLs, plus NuGet `NuGet.Config` files, source mappings,
+  and `auditSources`. Identify host-specific endpoints that an install could serialize into a committed lockfile.
 - Any hook framework already present, since `pre-commit` needs Python in the image and its own cache variable.
 - Any service the app talks to locally (database, cache, queue). This is the only trigger for Compose.
 - Whether any port is pinned by an external system (identity-provider redirect URI, webhook callback).
@@ -135,6 +141,11 @@ devcontainer exec --workspace-folder . -- bash -lc '<command>'
 **Exit 0 proves nothing about what was installed.** Confirm that each manifest found in inventory has its
 dependencies present afterwards: `node_modules/`, `obj/`, `.venv/`.
 
+For forwarded registries, also verify actual package operations in the container with host overrides both set and
+unset. Exercise retained feature installers as well as project installs; for .NET, check effective workspace
+package/audit sources and run restore plus the relevant NuGet client operation. Config-string checks alone do not
+prove which endpoint a consumer contacted.
+
 Batch configuration edits and rebuild once. Every `devcontainer.json` change requires
 `--remove-existing-container`, so an edit-per-rebuild loop is slow and wasteful.
 
@@ -144,6 +155,12 @@ Report which of these you ran and which you could not.
 
 - Every image claim traced to a command you ran inside the container.
 - Cache env vars match the package managers present in the repo.
+- Host registry build args and image env cover the relevant project managers and retained feature installers;
+  runtime commands see the same selected endpoints.
+- NuGet restore and non-MSBuild operations use the intended feed, and effective workspace sources and audit sources
+  have been checked without discarding required source mappings or audit coverage.
+- Lockfiles do not commit a host-private proxy URL; any staged-lockfile pre-commit hook was exercised with a
+  representative lockfile and preserves package integrity.
 - Post-create is strict, with no speculative steps.
 - The Dockerfile holds only create-invariant setup.
 - `remoteUser` and the `chown` target match the probed image.
@@ -245,6 +262,13 @@ The per-manager table is in [references/wiring.md](references/wiring.md#cache-en
 
 `UV_LINK_MODE: copy` is mandatory with uv: hardlinks cannot cross from the cache volume into the bind-mounted
 workspace, and uv falls back with a warning on every install otherwise.
+
+Emit host registry/feed forwarding for each relevant project manager and every retained feature that installs
+packages, even if no project manifest names that manager. Use build args and Dockerfile `ARG`/`ENV`, not
+`remoteEnv` alone: feature installers run while the image is built. See
+[references/wiring.md](references/wiring.md#registry-and-feed-forwarding). Forward only non-secret endpoint URLs;
+credentials belong in supported credential providers or secret delivery, never build args, image env, image layers,
+or logs.
 
 `history -a` flushes after each command so history reaches the volume before a rebuild rather than at shell exit.
 
@@ -353,6 +377,7 @@ silently substituting a different command.
 | Base image | The primary language and its pinned version; probe the tag |
 | Extra features | Secondary languages and CLIs the repo invokes |
 | Cache env vars | The lockfiles present: one row per manager, nothing speculative |
+| Registry/feed args | Managers used by project manifests and installers used by retained features |
 | Compose or not | Whether a second container is required |
 | Ports | Dev-server ports from config; pinned ports from the identity provider |
 | Extensions | The linters and formatters already configured, plus `task.vscode-task` |

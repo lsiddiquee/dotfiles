@@ -19,6 +19,18 @@ Report findings before editing. Sort every gap into one of four classes:
 
 Only the **broken** class may be edited without asking.
 
+For devcontainer patch audits, include package feeds. Compare host `NPM_CONFIG_REGISTRY`, `PIP_INDEX_URL`, and
+`NUGET_SOURCE` forwarding with both project managers and installers invoked by retained features; a feature such as
+Python with `installTools: true` is relevant even without a Python manifest. Inspect Dockerfile build args/env
+ordering, effective workspace NuGet sources, repository source mappings and `auditSources`, and lockfile URLs for
+host-private endpoints. A user-level NuGet source-count check alone is not proof of isolation.
+
+Treat missing forwarding as **missing**, not broken. Treat an existing source, mapping, or audit configuration as
+load-bearing until its effect is understood. Ask before changing it; never silently replace user configuration,
+remove source mappings or weaken audit coverage. Where a feed override is serialized into lockfiles, use an
+existing manager-aware pre-commit hook to prevent host-private URLs being committed, and verify that it preserves
+lockfile integrity rather than deleting URLs generically.
+
 ## Ask once, after the audit
 
 Put every missing and divergent finding into a single batched round of questions and wait. Do not fix the easy
