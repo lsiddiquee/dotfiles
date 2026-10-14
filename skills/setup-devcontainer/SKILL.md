@@ -16,7 +16,8 @@ The container must come up identically from a clean clone on any host, and every
 by running a command inside it. Base images change without notice.
 
 The post-create script calls `task dev:setup`. Defining that task surface, the lint configuration and the git
-hooks is out of scope here.
+hooks belongs to `setup-dev-workflow`. Require a manager-aware staged-lockfile guard there when host-private
+proxy URLs can enter lockfiles; do not strip URLs generically or damage package integrity.
 
 ## How to read this file
 
@@ -104,6 +105,10 @@ Read, do not guess:
   options and npm/pnpm/Corepack use too.
 - Host npm, pip/PyPI, and NuGet endpoint overrides, and which build-time feature installers and runtime commands
   actually consume each one. A feature-driven installer counts even when no matching manifest exists.
+- Poetry's installation method, version, loaded plugins, and active dependency sources. pip's index setting does
+  not select Poetry's dependency mirror.
+- Lockfile URLs and existing source policies: identify host-private endpoints that installs might serialize, and
+  the existing hook/task surface that can guard staged lockfiles without altering intentional private sources.
 
 In patch mode, diff this inventory against what the container already declares. A manifest with no matching
 feature, cache variable or install path is a **missing** finding; a feature or cache variable with no matching
@@ -148,6 +153,12 @@ runtime consumer (`npm` and `pnpm`/Corepack where used, pip, uv, or NuGet). Do n
 successful build as proof of consumption. Report unreachable feeds and authentication-dependent checks as
 unverified; do not print credentials or credential-bearing configuration while checking effective values.
 
+For Poetry, install the compatible mirror plugin before native dependency installation; verify its active
+dependency pool with the host override set and unset. Run a fresh cache-disabled native install and compare
+manifest/lockfile hashes. Verify expected development tools, not just a guarded script's exit status. Follow
+[the Poetry wiring](references/wiring.md#poetry-developer-mirrors); do not substitute pip export or project sources.
+Exercise any staged-lockfile guard with unsafe and valid lockfiles, including differing staged/working-tree content.
+
 For .NET, verify effective package sources from the workspace and each relevant project directory, including
 repository-level and nested `NuGet.Config` precedence, package source mappings, and `auditSources`. Exercise both
 an MSBuild restore (including package audit) and non-MSBuild search, add/update, and tool operations inside the
@@ -166,6 +177,10 @@ Report which of these you ran and which you could not.
 - Cache env vars match the package managers present in the repo.
 - Registry/feed args and image `ENV` cover relevant manifest and feature-driven installers at build and runtime;
   unset host overrides retain tool defaults.
+- Poetry mirror plugin compatibility, active dependency pool, native cache-disabled install, and unchanged
+  manifest/lockfile verified where Poetry is used.
+- Host-private proxy URLs cannot enter committed lockfiles; any staged-lockfile guard was exercised and preserves
+  package integrity and intentional private sources.
 - Post-create is strict, with no speculative steps.
 - The Dockerfile holds only create-invariant setup.
 - `remoteUser` and the `chown` target match the probed image.
@@ -279,6 +294,11 @@ host values are unset, and set `UV_DEFAULT_INDEX` from `PIP_INDEX_URL` when uv i
 `dotnet` is available. Preserve normal NuGet configuration when unset. Full wiring and safety checks:
 [references/wiring.md](references/wiring.md#package-registry-and-feed-forwarding).
 
+For Poetry, map the raw host PyPI override to `POETRY_PYPI_MIRROR_URL`, leaving it empty when unset. Install
+`poetry-plugin-pypi-mirror==0.6.5` into the actual Poetry environment before dependency installation, with its
+Poetry `>=2.1,<2.6` compatibility checked. Keep native Poetry installation and project source/lockfile contents.
+Coordinate manager-aware staged-lockfile protection with `setup-dev-workflow` if host-private URLs can be saved.
+
 `history -a` flushes after each command so history reaches the volume before a rebuild rather than at shell exit.
 
 #### .NET user-secrets persistence
@@ -331,7 +351,7 @@ anything that depends on the repo's current contents.
 | ----------------- | --------------------- |
 | Volume ownership seeding | Dependency installs from lockfiles: they change with the repo, and the build context is `.devcontainer/` rather than the repo root |
 | apt tooling, with any third-party apt repo and keyring it needs | Credentials or tokens, since every layer is readable with `docker history` |
-| Binaries with neither a feature nor an apt package: fetch a pinned release, verify its checksum, place it in `/usr/local/bin` | Host-specific values, since the image is shared |
+| Binaries with neither a feature nor an apt package: fetch a pinned release, verify its checksum, place it in `/usr/local/bin` | Hardcoded host-specific values; registry endpoints are supplied through per-build arguments |
 | Locale, timezone, CA certificates | Anything writing to a path a volume later covers |
 
 A mount hides whatever the image placed at that path unless the volume is empty, so install image-layer tools to

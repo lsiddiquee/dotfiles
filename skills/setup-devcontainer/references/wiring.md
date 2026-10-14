@@ -50,10 +50,12 @@ nonpersistent credential store, report that limitation instead of claiming the d
 Forward only the endpoint inputs used by manifests or retained features. Feature installers count even without a
 matching project manifest: for example, Python `installTools: true` invokes pip, and Node feature global packages
 can invoke npm. `NPM_CONFIG_REGISTRY` also needs verification with pnpm/Corepack when retained. `PIP_INDEX_URL`
-does not by itself prove that Poetry uses the selected source; preserve and validate Poetry's project source
-configuration rather than assuming pip's setting controls it.
+does not control Poetry dependency downloads; use the mirror plugin below for developer-specific PyPI overrides.
+Preserve existing project source configuration.
 
-Pass host values as non-secret endpoint URLs, with no host-side fallback. Declare only the relevant arguments:
+Pass host values as non-secret endpoint URLs, with no host-side fallback. Dev Containers CLI 0.89.0 can truncate
+colon-containing `${localEnv:NAME:https://...}` defaults to `https`; put URL fallbacks in Dockerfile `ENV`
+expansion instead. Declare only the relevant arguments:
 
 ```jsonc
 "build": {
@@ -83,6 +85,50 @@ ENV NPM_CONFIG_REGISTRY=${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org/} \
 # Add only when uv is used:
 ENV UV_DEFAULT_INDEX=${PIP_INDEX_URL:-https://pypi.org/simple}
 ```
+
+### Poetry developer mirrors
+
+When Poetry is used, add `POETRY_PYPI_MIRROR_URL=${PIP_INDEX_URL}` to the **same** `ENV` instruction that sets
+the pip fallback above. Docker expands that instruction using the incoming build argument: an absent or empty
+host override leaves the mirror empty, while pip still defaults to public PyPI. A later `ENV` instruction would
+read the already-defaulted pip value instead. Do not put this mirror only in `remoteEnv`; build-time consumers
+need it too.
+
+```dockerfile
+ARG PIP_INDEX_URL
+ARG NPM_CONFIG_REGISTRY
+ENV PIP_INDEX_URL=${PIP_INDEX_URL:-https://pypi.org/simple} \
+    NPM_CONFIG_REGISTRY=${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org/} \
+    POETRY_PYPI_MIRROR_URL=${PIP_INDEX_URL}
+```
+
+`POETRY_PYPI_MIRROR_URL` is supplied by `poetry-plugin-pypi-mirror`, not built-in Poetry.
+`POETRY_REPOSITORIES_PYPI_URL` configures publishing repositories, not the implicit dependency PyPI source.
+Plugin version `0.6.5` declares Poetry `>=2.1,<2.6`; check the installed Poetry version and recheck compatibility
+on upgrades rather than silently upgrading an existing installation.
+
+Install the plugin into the actual Poetry environment after Poetry is installed and before any dependency install.
+For pipx-managed Poetry, run as the user owning that pipx installation:
+
+```bash
+pipx inject poetry "poetry-plugin-pypi-mirror==0.6.5"
+poetry install --no-interaction
+```
+
+For other installation methods, use their supported plugin installation mechanism (for example,
+`poetry self add "poetry-plugin-pypi-mirror==0.6.5"` where supported). A feature-provided Poetry installation is
+not available in earlier Dockerfile steps: install the plugin in a later feature or setup task, before the first
+Poetry consumer. Keep native `poetry install`; do not export to pip, add a project-level primary source, or write
+developer-specific mirror URLs into `pyproject.toml` or `poetry.lock`. `poetry source add --priority=primary`
+is a separate project-wide dependency-source decision, not this container-only solution.
+
+Validate the loaded plugin and active Poetry dependency pool against the supplied credential-free mirror, not
+only the environment variable. With the host override unset, verify that implicit PyPI remains public. Run a
+fresh native `poetry --no-cache install --no-interaction` in a disposable project environment and compare manifest
+and lockfile hashes before and after. Verify expected development tools actually exist; a guarded post-create
+script returning zero is insufficient. Preserve the patch-mode approval requirement for converting guarded scripts.
+
+### NuGet feeds
 
 Use image `ENV`, not `remoteEnv` alone: build-time feature installers need the selected endpoint too. With no
 `NUGET_SOURCE`, leave normal NuGet source configuration intact. With an override, configure both MSBuild's
@@ -133,6 +179,17 @@ audit coverage or an existing config needs a policy decision, stop and report it
 bypassing configuration. Never put credentials, credential-bearing URLs, or host config files in build args, `ENV`,
 image layers, or logs; use supported credential providers or secret delivery for authenticated feeds.
 `NUGET_PACKAGES` is a cache path, not a source override.
+
+### Lockfile protection
+
+Inspect lockfiles after package operations for host-private proxy URLs. Use the repository's existing hook
+framework to reject or safely normalize affected **staged** lockfiles through its task surface before commit.
+The check must be manager-aware, preserve integrity hashes and intentional project-wide private sources, and
+inspect the staged content rather than only the working tree. Never strip or rewrite URLs indiscriminately.
+If no safe normalizer exists, reject the change with a diagnostic that does not reveal credentials.
+Exercise the actual hook with a representative private-proxy lockfile and a valid public-source lockfile in a
+disposable repository; confirm rejection or safe repair, unchanged package integrity, and that unstaged edits
+cannot hide an unsafe staged URL. Coordinate hook wiring with `setup-dev-workflow`; do not add duplicate commands.
 
 ## .NET user-secrets store
 

@@ -25,6 +25,12 @@ Python `installTools: true` still counts when the repo has no Python manifest. F
 workspace and nested-project sources, source mappings, and `auditSources`; a user-level source list alone does not
 prove repository operations are isolated. Preserve existing NuGet configuration and required audit coverage.
 
+Audit Poetry's actual installation and dependency pool rather than assuming `PIP_INDEX_URL` controls it. Missing
+forwarding or a missing compatible mirror plugin is **missing** unless a failing consumer proves it **broken**.
+Inspect lockfiles for host-private proxy URLs and coordinate a manager-aware staged-lockfile guard with the existing
+hook/task surface. Preserve package integrity, intentional private sources, and unrelated settings; do not blindly
+rewrite URLs. Adding this guard does not authorize converting an existing guarded post-create script to strict.
+
 ## Ask once, after the audit
 
 Put every missing and divergent finding into a single batched round of questions and wait. Do not fix the easy
