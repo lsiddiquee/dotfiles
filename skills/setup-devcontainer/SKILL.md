@@ -16,7 +16,8 @@ The container must come up identically from a clean clone on any host, and every
 by running a command inside it. Base images change without notice.
 
 The post-create script calls `task dev:setup`. Defining that task surface, the lint configuration and the git
-hooks is out of scope here.
+hooks belongs to `setup-dev-workflow`. Require a manager-aware staged-lockfile guard there when host-private
+proxy URLs can enter lockfiles; do not strip URLs generically or damage package integrity.
 
 ## How to read this file
 
@@ -99,10 +100,21 @@ Read, do not guess:
 - Any service the app talks to locally (database, cache, queue). This is the only trigger for Compose.
 - Whether any port is pinned by an external system (identity-provider redirect URI, webhook callback).
 - For .NET, `UserSecretsId`, local secret provisioning, and the actual remote user's secret-store path and mounts.
+- Every installer invoked by a retained feature and its options, not just project manifests. For example,
+  Python `installTools: true` installs packages even without a Python manifest; inspect Node feature global-package
+  options and npm/pnpm/Corepack use too.
+- Host npm, pip/PyPI, and NuGet endpoint overrides, and which build-time feature installers and runtime commands
+  actually consume each one. A feature-driven installer counts even when no matching manifest exists.
+- Poetry's installation method, version, loaded plugins, and active dependency sources. pip's index setting does
+  not select Poetry's dependency mirror.
+- Lockfile URLs and existing source policies: identify host-private endpoints that installs might serialize, and
+  the existing hook/task surface that can guard staged lockfiles without altering intentional private sources.
 
 In patch mode, diff this inventory against what the container already declares. A manifest with no matching
 feature, cache variable or install path is a **missing** finding; a feature or cache variable with no matching
-manifest is **divergent**. A container that builds cleanly can still be months behind the repo's stack.
+manifest is **divergent**. Also audit each retained feature's installer against the appropriate host feed override;
+manifest-only checks miss installs such as Python `installTools: true`. A container that builds cleanly can still be
+months behind the repo's stack.
 
 ### 2. Choose and probe the base image
 
@@ -135,6 +147,25 @@ devcontainer exec --workspace-folder . -- bash -lc '<command>'
 **Exit 0 proves nothing about what was installed.** Confirm that each manifest found in inventory has its
 dependencies present afterwards: `node_modules/`, `obj/`, `.venv/`.
 
+For every relevant feed override, trial the generated container with the host variable both set and unset. Verify
+the selected endpoint using a real build-time installer when a retained feature downloads packages, and a real
+runtime consumer (`npm` and `pnpm`/Corepack where used, pip, uv, or NuGet). Do not treat a copied config string or
+successful build as proof of consumption. Report unreachable feeds and authentication-dependent checks as
+unverified; do not print credentials or credential-bearing configuration while checking effective values.
+
+For Poetry, install the compatible mirror plugin before native dependency installation; verify its active
+dependency pool with the host override set and unset. Run a fresh cache-disabled native install and compare
+manifest/lockfile hashes. Verify expected development tools, not just a guarded script's exit status. Follow
+[the Poetry wiring](references/wiring.md#poetry-developer-mirrors); do not substitute pip export or project sources.
+Exercise any staged-lockfile guard with unsafe and valid lockfiles, including differing staged/working-tree content.
+
+For .NET, verify effective package sources from the workspace and each relevant project directory, including
+repository-level and nested `NuGet.Config` precedence, package source mappings, and `auditSources`. Exercise both
+an MSBuild restore (including package audit) and non-MSBuild search, add/update, and tool operations inside the
+container. Use a disposable project or tool manifest for operations that modify files. Confirm the approved feed is
+used without removing required audit coverage or silently bypassing repository configuration; if the approved feed
+cannot provide that coverage, report the check as unverified.
+
 Batch configuration edits and rebuild once. Every `devcontainer.json` change requires
 `--remove-existing-container`, so an edit-per-rebuild loop is slow and wasteful.
 
@@ -144,6 +175,12 @@ Report which of these you ran and which you could not.
 
 - Every image claim traced to a command you ran inside the container.
 - Cache env vars match the package managers present in the repo.
+- Registry/feed args and image `ENV` cover relevant manifest and feature-driven installers at build and runtime;
+  unset host overrides retain tool defaults.
+- Poetry mirror plugin compatibility, active dependency pool, native cache-disabled install, and unchanged
+  manifest/lockfile verified where Poetry is used.
+- Host-private proxy URLs cannot enter committed lockfiles; any staged-lockfile guard was exercised and preserves
+  package integrity and intentional private sources.
 - Post-create is strict, with no speculative steps.
 - The Dockerfile holds only create-invariant setup.
 - `remoteUser` and the `chown` target match the probed image.
@@ -175,6 +212,7 @@ What to ask about, once the audit is done:
 | Manager present, cache var absent | Point it at the cache volume? | Yes |
 | Manifest for a language the container does not provide | Add the feature and its cache var? Name the manifest that proves the language is used. | Yes |
 | Feature or cache var for a language no longer in the repo | Remove it? Every rebuild currently pays for it. | Ask, since a script you cannot see may still call it |
+| Relevant installer does not consume the host registry/feed override | Feature builds or runtime commands may contact an unintended public feed. | Wire and verify the relevant override; include retained feature installers even without manifests |
 | Newer image or feature major exists | Bump? | **No**, since it is not broken and costs everyone a rebuild |
 | Unexplained line | What does this do? Keeping it until you say otherwise. | Keep |
 
@@ -246,6 +284,21 @@ The per-manager table is in [references/wiring.md](references/wiring.md#cache-en
 `UV_LINK_MODE: copy` is mandatory with uv: hardlinks cannot cross from the cache volume into the bind-mounted
 workspace, and uv falls back with a warning on every install otherwise.
 
+#### Registry and feed forwarding
+
+Forward only non-secret endpoint URLs needed by actual manifest or retained feature installers. Pass host values
+through `build.args` and declare Dockerfile `ARG`/image `ENV` before feature installation, so both build-time
+installers and runtime commands inherit them; `remoteEnv` alone is too late. Use the native npm/PyPI defaults when
+host values are unset, and set `UV_DEFAULT_INDEX` from `PIP_INDEX_URL` when uv is used. For .NET, wire
+`NUGET_SOURCE` to `RestoreSources` and the probed remote user's NuGet client config only when overridden, after
+`dotnet` is available. Preserve normal NuGet configuration when unset. Full wiring and safety checks:
+[references/wiring.md](references/wiring.md#package-registry-and-feed-forwarding).
+
+For Poetry, map the raw host PyPI override to `POETRY_PYPI_MIRROR_URL`, leaving it empty when unset. Install
+`poetry-plugin-pypi-mirror==0.6.5` into the actual Poetry environment before dependency installation, with its
+Poetry `>=2.1,<2.6` compatibility checked. Keep native Poetry installation and project source/lockfile contents.
+Coordinate manager-aware staged-lockfile protection with `setup-dev-workflow` if host-private URLs can be saved.
+
 `history -a` flushes after each command so history reaches the volume before a rebuild rather than at shell exit.
 
 #### .NET user-secrets persistence
@@ -298,7 +351,7 @@ anything that depends on the repo's current contents.
 | ----------------- | --------------------- |
 | Volume ownership seeding | Dependency installs from lockfiles: they change with the repo, and the build context is `.devcontainer/` rather than the repo root |
 | apt tooling, with any third-party apt repo and keyring it needs | Credentials or tokens, since every layer is readable with `docker history` |
-| Binaries with neither a feature nor an apt package: fetch a pinned release, verify its checksum, place it in `/usr/local/bin` | Host-specific values, since the image is shared |
+| Binaries with neither a feature nor an apt package: fetch a pinned release, verify its checksum, place it in `/usr/local/bin` | Hardcoded host-specific values; registry endpoints are supplied through per-build arguments |
 | Locale, timezone, CA certificates | Anything writing to a path a volume later covers |
 
 A mount hides whatever the image placed at that path unless the volume is empty, so install image-layer tools to
@@ -353,6 +406,7 @@ silently substituting a different command.
 | Base image | The primary language and its pinned version; probe the tag |
 | Extra features | Secondary languages and CLIs the repo invokes |
 | Cache env vars | The lockfiles present: one row per manager, nothing speculative |
+| Registry/feed args and image env | Actual installers in manifests and retained features; forward only relevant non-secret endpoint URLs |
 | Compose or not | Whether a second container is required |
 | Ports | Dev-server ports from config; pinned ports from the identity provider |
 | Extensions | The linters and formatters already configured, plus `task.vscode-task` |

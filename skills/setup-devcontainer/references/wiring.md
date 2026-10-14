@@ -45,6 +45,152 @@ directory. Do not force `--insecure-storage` to make persistence work. Preserve 
 before and after a rebuild, without `--show-token` or reading credential files. If authentication uses a
 nonpersistent credential store, report that limitation instead of claiming the directory alone preserves login.
 
+## Package registry and feed forwarding
+
+Forward only the endpoint inputs used by manifests or retained features. Feature installers count even without a
+matching project manifest: for example, Python `installTools: true` invokes pip, and Node feature global packages
+can invoke npm. `NPM_CONFIG_REGISTRY` also needs verification with pnpm/Corepack when retained. `PIP_INDEX_URL`
+does not control Poetry dependency downloads; use the mirror plugin below for developer-specific PyPI overrides.
+Preserve existing project source configuration.
+
+Pass host values as non-secret endpoint URLs, with no host-side fallback. Dev Containers CLI 0.89.0 can truncate
+colon-containing `${localEnv:NAME:https://...}` defaults to `https`; put URL fallbacks in Dockerfile `ENV`
+expansion instead. Declare only the relevant arguments:
+
+```jsonc
+"build": {
+  "dockerfile": "Dockerfile",
+  "args": {
+    // Keep only entries used by manifests or retained feature installers.
+    "NPM_CONFIG_REGISTRY": "${localEnv:NPM_CONFIG_REGISTRY}",
+    "PIP_INDEX_URL": "${localEnv:PIP_INDEX_URL}",
+    "NUGET_SOURCE": "${localEnv:NUGET_SOURCE}"
+  }
+}
+```
+
+Declare the same arguments in the Dockerfile before feature installation. Let unset or empty npm and pip overrides
+fall back to their normal public defaults; emit only variables relevant to the repo or retained features.
+`UV_DEFAULT_INDEX` is needed when uv is used and must follow `PIP_INDEX_URL`.
+
+```dockerfile
+# Keep only arguments and ENV entries relevant to this repo or its retained features.
+ARG NPM_CONFIG_REGISTRY
+ARG PIP_INDEX_URL
+ARG NUGET_SOURCE
+ENV NPM_CONFIG_REGISTRY=${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org/} \
+    PIP_INDEX_URL=${PIP_INDEX_URL:-https://pypi.org/simple} \
+    NUGET_SOURCE=${NUGET_SOURCE} \
+    RestoreSources=${NUGET_SOURCE}
+# Add only when uv is used:
+ENV UV_DEFAULT_INDEX=${PIP_INDEX_URL:-https://pypi.org/simple}
+```
+
+### Poetry developer mirrors
+
+When Poetry is used, add `POETRY_PYPI_MIRROR_URL=${PIP_INDEX_URL}` to the **same** `ENV` instruction that sets
+the pip fallback above. Docker expands that instruction using the incoming build argument: an absent or empty
+host override leaves the mirror empty, while pip still defaults to public PyPI. A later `ENV` instruction would
+read the already-defaulted pip value instead. Do not put this mirror only in `remoteEnv`; build-time consumers
+need it too.
+
+```dockerfile
+ARG PIP_INDEX_URL
+ARG NPM_CONFIG_REGISTRY
+ENV PIP_INDEX_URL=${PIP_INDEX_URL:-https://pypi.org/simple} \
+    NPM_CONFIG_REGISTRY=${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org/} \
+    POETRY_PYPI_MIRROR_URL=${PIP_INDEX_URL}
+```
+
+`POETRY_PYPI_MIRROR_URL` is supplied by `poetry-plugin-pypi-mirror`, not built-in Poetry.
+`POETRY_REPOSITORIES_PYPI_URL` configures publishing repositories, not the implicit dependency PyPI source.
+Plugin version `0.6.5` declares Poetry `>=2.1,<2.6`; check the installed Poetry version and recheck compatibility
+on upgrades rather than silently upgrading an existing installation.
+
+Install the plugin into the actual Poetry environment after Poetry is installed and before any dependency install.
+For pipx-managed Poetry, run as the user owning that pipx installation:
+
+```bash
+pipx inject poetry "poetry-plugin-pypi-mirror==0.6.5"
+poetry install --no-interaction
+```
+
+For other installation methods, use their supported plugin installation mechanism (for example,
+`poetry self add "poetry-plugin-pypi-mirror==0.6.5"` where supported). A feature-provided Poetry installation is
+not available in earlier Dockerfile steps: install the plugin in a later feature or setup task, before the first
+Poetry consumer. Keep native `poetry install`; do not export to pip, add a project-level primary source, or write
+developer-specific mirror URLs into `pyproject.toml` or `poetry.lock`. `poetry source add --priority=primary`
+is a separate project-wide dependency-source decision, not this container-only solution.
+
+Validate the loaded plugin and active Poetry dependency pool against the supplied credential-free mirror, not
+only the environment variable. With the host override unset, verify that implicit PyPI remains public. Run a
+fresh native `poetry --no-cache install --no-interaction` in a disposable project environment and compare manifest
+and lockfile hashes before and after. Verify expected development tools actually exist; a guarded post-create
+script returning zero is insufficient. Preserve the patch-mode approval requirement for converting guarded scripts.
+
+### NuGet feeds
+
+Use image `ENV`, not `remoteEnv` alone: build-time feature installers need the selected endpoint too. With no
+`NUGET_SOURCE`, leave normal NuGet source configuration intact. With an override, configure both MSBuild's
+`RestoreSources` and the probed remote user's NuGet client config, after `dotnet` is available in the relevant
+Dockerfile stage. Run that step as root, then restore the Dockerfile's intended `USER`. For a new client config, a
+source-only setup can be bootstrapped as follows; substitute the verified user and group, and do not overwrite an
+existing config:
+
+If the SDK is supplied only by a Dev Container Feature installed after Dockerfile instructions, do not place this
+step earlier and claim it succeeded. Use an SDK base image or a later setup hook that runs after the SDK and before
+any dependent build-time installer; otherwise report build-time NuGet coverage as unverified.
+
+```dockerfile
+RUN if [ -n "${NUGET_SOURCE}" ]; then \
+        set -eu; \
+        command -v dotnet >/dev/null; \
+        config=/home/<remoteUser>/.nuget/NuGet/NuGet.Config; \
+        mkdir -p "$(dirname "$config")"; \
+        if [ -e "$config" ]; then \
+            echo "Existing NuGet.Config requires review; refusing to overwrite" >&2; \
+            exit 1; \
+        fi; \
+        printf '%s\n' \
+            '<?xml version="1.0" encoding="utf-8"?>' \
+            '<configuration>' \
+            '  <packageSources>' \
+            '    <clear />' \
+            '  </packageSources>' \
+            '</configuration>' > "$config"; \
+        dotnet nuget add source "${NUGET_SOURCE}" --name environment \
+            --configfile "$config" >/dev/null; \
+        dotnet nuget list source --configfile "$config" --format Short \
+            > /tmp/nuget-sources; \
+        test "$(grep -c '^E ' /tmp/nuget-sources)" -eq 1; \
+        rm /tmp/nuget-sources; \
+        chown -R <remoteUser>:<remoteGroup> "$(dirname "$(dirname "$config")")"; \
+    fi
+```
+
+The source-count check is only a bootstrap check, not proof of effective isolation. Preserve existing configuration,
+package source mappings, and required `auditSources`; inspect effective sources from the workspace and relevant
+project directories because repository and nested `NuGet.Config` files can add or change sources. Verify in the
+unset-host trial that an empty `RestoreSources` value preserves normal sources; if the selected SDK treats it as an
+override, arrange for the property to be absent when `NUGET_SOURCE` is empty. Verify an MSBuild
+restore (including package audit) and non-MSBuild search, add/update, and tool operations against the approved feed;
+use a disposable project or tool manifest for operations that modify files. If an override cannot retain required
+audit coverage or an existing config needs a policy decision, stop and report it rather than silently clearing or
+bypassing configuration. Never put credentials, credential-bearing URLs, or host config files in build args, `ENV`,
+image layers, or logs; use supported credential providers or secret delivery for authenticated feeds.
+`NUGET_PACKAGES` is a cache path, not a source override.
+
+### Lockfile protection
+
+Inspect lockfiles after package operations for host-private proxy URLs. Use the repository's existing hook
+framework to reject or safely normalize affected **staged** lockfiles through its task surface before commit.
+The check must be manager-aware, preserve integrity hashes and intentional project-wide private sources, and
+inspect the staged content rather than only the working tree. Never strip or rewrite URLs indiscriminately.
+If no safe normalizer exists, reject the change with a diagnostic that does not reveal credentials.
+Exercise the actual hook with a representative private-proxy lockfile and a valid public-source lockfile in a
+disposable repository; confirm rejection or safe repair, unchanged package integrity, and that unstaged edits
+cannot hide an unsafe staged URL. Coordinate hook wiring with `setup-dev-workflow`; do not add duplicate commands.
+
 ## .NET user-secrets store
 
 For Linux .NET projects using user-secrets, add a dedicated mount at the verified user's store path
