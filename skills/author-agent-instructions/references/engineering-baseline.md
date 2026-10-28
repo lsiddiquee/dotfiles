@@ -1,10 +1,10 @@
 # Default engineering baseline
 
-**Register: payload.** Everything below is substance for the generated file, not instructions to you. It restates
-ideas from the process sections on purpose.
+**Register: payload**, except the explicitly marked gate emission and checklist adaptation guidance. The payload
+is substance for the generated file. It restates ideas from the process sections on purpose.
 
-Include these sections in every generated file unless the user overrides them. They are intentional preferences for
-harnessing engineering agents. Adapt wording to the repo; keep the substance. When the user overrides a baseline
+Include non-gate sections in every generated file unless the user overrides them. Configurable approval gates
+require a confirmed policy under the skill's selection flow. Adapt wording to the repo; keep the substance. When the user overrides a baseline
 rule, record the override in the generated file as a one-line `(confirmed)` note, so the next run does not silently
 reinstate it.
 
@@ -14,6 +14,9 @@ reinstate it.
 - Validate at trust boundaries.
 - Never delete or weaken tests to land a change.
 - Do not bypass or weaken repo linters, formatters, type-checkers, or analyzers to land a change.
+- Preserve existing deployed/shared data through migration unless the user separately authorizes a destructive
+   operation. Unreleased or greenfield status does not authorize resetting, deleting or reseeding that data.
+   Model approval, gate-policy selection and review waivers are not destructive-operation authorization.
 
 ## Engineering discipline
 
@@ -22,7 +25,10 @@ reinstate it.
   text, or explicit throwaway spikes are exempt unless the user says otherwise. Scripts and declarative text follow
   execution-based validation under Testing.
 - **YAGNI.** Smallest thing that ships the current slice. While work is unreleased, prefer a clean break over a
-  compatibility shim or dual path.
+   compatibility shim or dual path, without bypassing the selected model-review policy or data-preservation rules.
+- **Reuse the owning aggregate.** When an existing aggregate represents the concept, prefer lifecycle states and
+   workflow-specific validation over equivalent duplicate models. Separate models need a justified ownership or
+   domain boundary, reviewed under the selected model-approval policy when applicable.
 - **DRY on the third instance.** First stays local; second is compared; third stable copy earns a shared abstraction
   in the owning layer.
 - **No introduced regressions.** Leave quality at status quo or better. Do not add warnings, deprecations, lint
@@ -30,6 +36,34 @@ reinstate it.
   is not an exemption. If it cannot be fixed now, do not land the noisy change.
 - **Small, reversible changes.** Fix root causes. Match existing seams before inventing new ones.
 - **No over-engineering.** Only what was asked for or is clearly necessary. Do not handle states that cannot happen.
+
+## Configurable approval gate: Domain and persistence model approval
+
+**Emission guidance (process, not payload):** Preserve an existing confirmed policy or verified binding repository
+policy unless the user requests a change. Retain the source of inherited policies without inventing user
+confirmation. Review mode reports findings without edits or required selections. In write mode, for new or unresolved
+policies or requested changes, offer Enable (recommended), Customize or Disable before
+drafting this gate; do not re-ask a choice the user has already supplied. Emit the following policy only when
+enabled; replace it with the confirmed terms when customized.
+When disabled, record that decision without emitting this approval obligation or its conditional completion check.
+When unanswered, keep the policy pending, preserving existing gate text rather than silently changing it. The
+non-negotiable data-preservation rule applies independently of this selection. Future configurable gates must use
+the same selection contract in the authoring guide, not become mandatory through baseline inclusion.
+
+**Recommended policy (payload when enabled):**
+
+- Before implementing a new or materially changed domain/persistence model, present entities/aggregates,
+   ownership, relationships, lifecycle states and key invariants. Identify the source of truth and any parallel
+   models, explaining why each is necessary.
+- Obtain explicit user approval of that model before implementation, unless the user explicitly waives the review.
+   A general request to implement a feature is not model approval. Gate enablement is not model approval either.
+- Reuse an existing aggregate for the same concept; prefer lifecycle states and workflow-specific validation over
+   equivalent duplicate models unless an approved boundary justifies separation.
+- Record the approved model or explicit one-off waiver in the owning design documentation. Record a waiver's scope
+   so it cannot silently disable future reviews. Renew approval for material departures from the approved model,
+   not routine implementation details within it. Do not reopen unchanged approved decisions.
+- Model approval or waiver never authorizes resetting, deleting or reseeding deployed/shared data; obtain separate
+   authorization for any destructive operation and otherwise preserve data through migration.
 
 ## Testing
 
@@ -39,7 +73,7 @@ reinstate it.
   system; prove prompt and schema behaviour with a trial run or evaluation harness against the real consumer. Syntax
   checks are supplementary, not proof of runtime correctness. Report execution not performed. Accidental omission is
   review's job. Genuine shared functions may have behaviour-focused unit tests; do not extract helpers merely to
-  justify tests. This exception does not waive application behaviour tests. (confirmed)
+   justify tests. This exception does not waive application behaviour tests.
 - While iterating, run the narrowest check that proves the point, not the whole suite by default.
 - **Never delete or weaken a test to make a change pass.**
 - Cover failure paths, not only the happy path.
@@ -62,6 +96,13 @@ repository yet; do not leave dangling references.
    as a checked surface; define the format in the Commits section before citing it here.
 6. Docs current: whichever file owns the changed behaviour updated in the same change.
 7. Durable learnings captured and promoted; not left only in assistant memory or task state.
+
+**Checklist adaptation (process, not payload):** For an enabled model-approval gate, add: "For applicable model
+changes, approval or an explicit scoped waiver is recorded in the owning design documentation; material departures
+have renewed approval." For a customized gate, add the matching completion predicate under its confirmed terms.
+For a disabled or pending gate, do not introduce a model-approval checklist item. A pending policy does not permit
+removing an existing obligation. Preserve separate destructive-operation authorization checks whenever relevant,
+regardless of the model-gate choice.
 
 ## Context persistence
 

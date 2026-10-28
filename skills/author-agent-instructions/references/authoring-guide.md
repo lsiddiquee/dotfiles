@@ -5,8 +5,7 @@ generated file. Use the section guidance only from inventory or confirmation.
 
 ## Line economy
 
-An always-on instruction file is loaded often and acted on unevenly. Each line must buy more than it costs. Most
-files fail by saying too much that was already true elsewhere, not by saying something wrong.
+Keep lines that change an agent's decisions. Remove duplicated configuration and prose that adds no instruction.
 
 Every candidate line answers:
 
@@ -46,6 +45,59 @@ The asymmetric-downside exception above still applies: a high-cost rule may be r
 the file says the redundancy is deliberate.
 
 ## Repo-shaped sections
+
+### Configurable gate authoring contract
+
+Every configurable approval gate added to this skill or its payload must use this contract. A new approval
+obligation is a gate even if phrased as a baseline rule or checklist item. Do not silently add mandatory gates, or
+make existing safety requirements optional by relabeling them. Gate selection is authoring process; generated
+repository instructions contain the resolved policy, not the skill's question-tool workflow.
+
+Each gate definition must name:
+
+| Field | Required content |
+| ----- | ---------------- |
+| Purpose and trigger | The risk addressed and exactly which changes require review |
+| Recommended policy | Review content, approver, timing and conditions requiring renewed approval |
+| Choices | Enable the recommendation, customize its terms, or disable this gate; explain each consequence |
+| Waivers and exemptions | Who can waive review, for which scope, and how the waiver is recorded |
+| Decision owner | Where the confirmed policy and individual approvals/waivers live; use real or deliberately created paths |
+| Completion predicate | The Definition of Done check derived from the chosen terms, absent when disabled |
+
+Use the interactive ask-question tool when available, with an explicit-question fallback. Recommend enabling the
+documented policy, but never treat a default, silence or a skipped answer as consent. Batch initial gate choices
+with other questions. For Customize, offer the recommended terms as defaults and ask only for unresolved trigger,
+review content, approver, waivers/exemptions, recording and reapproval details. A focused follow-up is allowed;
+unresolved terms stay pending, not guessed.
+
+Persist each newly selected policy as a named `(confirmed)` decision: enabled, customized with effective terms, or
+disabled. Keep policy choice distinct from approval or a scoped waiver for a particular change. Preserve confirmed
+choices on later runs unless a change is requested. Preserve inherited binding policies verified from authoritative
+repository instructions, adopted design decisions or enforcement with their sources and effective terms, even
+without confirmation markers. Do not invent a fresh confirmation record or re-ask an established choice.
+If authority or meaning is unclear, retain existing gate text while asking for clarification in write mode; review
+mode reports the uncertainty without requiring a selection. Trimming and review must retain the selected behavior, not reinstate the
+recommendation. Update all affected prose and completion checks together so disabling a gate cannot leave an
+equivalent approval obligation elsewhere. Never weaken independent data-safety authorization.
+
+When adding or changing a configurable gate, trial the skill against these cases and inspect decisions and emitted
+instructions, not exact phrases or Markdown presence:
+
+| Trial | Expected behavior |
+| ----- | ----------------- |
+| Enable model gate; draft-to-issued lifecycle | Ask once, record the choice, require model presentation and user approval/scoped waiver before implementation; prefer one aggregate with states |
+| Customize model gate | Resolve all custom terms; generate matching rules and completion checks rather than the recommendation |
+| Disable model gate | Record the choice, omit its approval obligation and completion check; preserve aggregate-reuse and data-safety rules |
+| No answer or incomplete customization | Report pending; no assumed consent, no new gate obligation, no removal of an existing gate |
+| Repeat run with confirmed custom policy | Retain its terms without asking again or replacing it with defaults |
+| Inherited binding gate without confirmation markers | Preserve its verified source and effective terms without asking again or inventing confirmation |
+| Review-only request with unresolved policies | Report findings and uncertainty without edits or mandatory policy selection |
+| Ambiguous write target among existing instruction files | Resolve ownership before writing; do not create a third file or merge differing policies |
+| Shared-database schema change, any gate choice/waiver | Preserve data through migration unless destructive operations are separately authorized |
+| Representative future gate | Apply the same question flow, choice recording and matching checks without shipping a speculative gate |
+
+Report which trials were actually performed. A walkthrough review is not an interactive consumer trial; distinguish
+the two and disclose any unexecuted question-tool or generation behavior.
 
 ### Intro
 
@@ -101,5 +153,8 @@ When known, say which file owns human setup vs agent rules. Require updates in t
 | Dumping architecture | Stale quickly | Only constraints on work |
 | Inventing stack or conventions | Wrong with high confidence | Verified fact, baseline, or ask |
 | Omitting an attested language/domain | Agents freestyle against the repo | Name it; point at enforcing tools |
-| Citing an undefined "required format" | Agents enforce fog | Define it or delete the cite |
-| Mixing durable notes into task state | Lossy file eats them | `patterns.md`, then promote |
+| Citing an undefined "required format" | Agents cannot determine the required format | Define it or delete the cite |
+| Mixing durable notes into task state | Task-state cleanup can delete durable notes | `patterns.md`, then promote |
+| Adding a configurable gate as unconditional baseline | User never selected a repository policy | Use the gate-selection contract before emitting rules |
+| Treating a recommendation or silence as consent | Applies an unapproved gate policy | Keep the choice pending until explicitly resolved |
+| Keeping an approval checklist after disabling its gate | Reintroduces the gate indirectly | Derive prose and completion checks from the same confirmed policy |
