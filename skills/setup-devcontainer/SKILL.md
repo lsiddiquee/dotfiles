@@ -7,8 +7,8 @@ description: "Use when creating, reviewing, auditing or repairing a repository's
 
 This skill has two jobs:
 
-1. **Author** the container for a repository: `.devcontainer/devcontainer.json`, a Dockerfile, and a post-create
-   script.
+1. **Author** the container for a repository: `.devcontainer/devcontainer.json`, a Dockerfile, a post-create
+  script and an ownership-repair script.
 2. **Apply a default container baseline**: caching, persistence, image selection and script discipline,
    stack-neutral except for its wiring. Applied in full unless the user overrides a named part.
 
@@ -83,6 +83,7 @@ Default layout, when the user names nothing:
 .devcontainer/devcontainer.json
 .devcontainer/Dockerfile
 .devcontainer/post-create.sh
+.devcontainer/fix-ownership.sh
 ```
 
 If the repo already has a `.devcontainer/`, you are in **patch mode** rather than authoring mode. Read
@@ -127,7 +128,8 @@ Emit `devcontainer.json` and the Dockerfile per [Container baseline](#container-
 
 ### 4. Write the post-create script
 
-Strict discipline, per [Post-create contract](#post-create-contract).
+Strict discipline, per [Post-create contract](#post-create-contract). Copy the bundled
+[ownership script](assets/fix-ownership.sh) to `.devcontainer/fix-ownership.sh` and invoke it first from post-create.
 
 ### 5. Build and validate
 
@@ -146,6 +148,11 @@ devcontainer exec --workspace-folder . -- bash -lc '<command>'
 
 **Exit 0 proves nothing about what was installed.** Confirm that each manifest found in inventory has its
 dependencies present afterwards: `node_modules/`, `obj/`, `.venv/`.
+
+Verify the remote user's UID/GID and write access on every mounted cache/editor directory after post-create,
+both on first creation and with reused volumes. Check that existing extension/history files survive. Do not delete
+volumes to make ownership checks pass. Confirm the editor can attach and install an extension; report any
+unperformed editor-startup check as unverified.
 
 For every relevant feed override, trial the generated container with the host variable both set and unset. Verify
 the selected endpoint using a real build-time installer when a retained feature downloads packages, and a real
@@ -183,7 +190,8 @@ Report which of these you ran and which you could not.
   package integrity and intentional private sources.
 - Post-create is strict, with no speculative steps.
 - The Dockerfile holds only create-invariant setup.
-- `remoteUser` and the `chown` target match the probed image.
+- Ownership repair runs first in post-create as the probed `remoteUser`, covers all relevant mounted directories,
+  and uses that user's runtime UID/GID. No ownership changes remain in the Dockerfile or later lifecycle hooks.
 - If .NET user-secrets are used, their dedicated store survives recreation, has restricted access, and required
   local settings are provisioned without exposing values. Report any recreation check not performed.
 - `devcontainer-lock.json` committed after the build.
@@ -231,8 +239,7 @@ change with a rebuild, never as a drive-by while fixing something else.
 
 ### Base image selection
 
-Pick the image matching the primary language; add other languages as features. The Dockerfile that seeds volume
-ownership builds `FROM` it.
+Pick the image matching the primary language; add other languages as features. The Dockerfile builds `FROM` it.
 
 **Probe every candidate tag before use:**
 
@@ -271,12 +278,17 @@ Wiring for all three: [references/wiring.md](references/wiring.md#workspace-moun
 
 #### Volume ownership
 
-A named volume is created root-owned on first mount, so every cache write fails until something fixes it. Seed
-the ownership in the Dockerfile.
+Mounted directories can be root-owned or retain an old UID/GID across rebuilds. Repair ownership after mounts
+exist, as the first step of `postCreateCommand`, using a dedicated `.devcontainer/fix-ownership.sh` script.
+Cover the cache volume, the VS Code server volume and any other configured user-owned setup directories. Resolve
+the owner from the running `remoteUser`, not a hardcoded image UID/GID. Do not seed ownership in the Dockerfile,
+defer it to dotfiles or a later lifecycle hook, or recreate volumes to fix permissions.
 
-**Seeding only works while the volume is empty.** On a repo whose cache volume already exists, switching to it
-changes nothing and the volume stays root-owned, so that repo keeps its post-create chown unless the volume is
-being recreated. Both forms: [references/wiring.md](references/wiring.md#volume-ownership-seeding).
+Run the post-create script as `remoteUser`, with non-interactive sudo available when that user is non-root.
+Set `waitFor` to `postCreateCommand` so normal editor attachment waits for setup. This does not move server
+bootstrap after post-create: if startup fails before hooks can run, diagnose that earlier path separately rather
+than claiming post-create can repair it. Script and wiring:
+[references/wiring.md](references/wiring.md#post-create-ownership-repair).
 
 **Emit only the cache variables whose tooling the repo uses.** Unused variables are noise that outlives the tool.
 The per-manager table is in [references/wiring.md](references/wiring.md#cache-environment-variables).
@@ -349,10 +361,10 @@ anything that depends on the repo's current contents.
 
 | In the Dockerfile | Not in the Dockerfile |
 | ----------------- | --------------------- |
-| Volume ownership seeding | Dependency installs from lockfiles: they change with the repo, and the build context is `.devcontainer/` rather than the repo root |
+| System tooling independent of mounted directories | Dependency installs from lockfiles: they change with the repo, and the build context is `.devcontainer/` rather than the repo root |
 | apt tooling, with any third-party apt repo and keyring it needs | Credentials or tokens, since every layer is readable with `docker history` |
 | Binaries with neither a feature nor an apt package: fetch a pinned release, verify its checksum, place it in `/usr/local/bin` | Hardcoded host-specific values; registry endpoints are supplied through per-build arguments |
-| Locale, timezone, CA certificates | Anything writing to a path a volume later covers |
+| Locale, timezone, CA certificates | Ownership changes, or anything writing to a path a volume later covers |
 
 A mount hides whatever the image placed at that path unless the volume is empty, so install image-layer tools to
 `/usr/local/bin`, never into `/.devcontainercache`.
@@ -383,16 +395,17 @@ No `command -v` guards, no `|| true`, no steps for tooling the repo does not yet
 This governs scripts you write. For an existing guarded script, see
 [Converting a guarded post-create script](#converting-a-guarded-post-create-script).
 
-Order. With ownership seeded and apt baked into the image, the script is short:
+Order. With apt baked into the image, the script is short:
 
-1. `task dev:setup`, so dependency install and hook registration live in the Taskfile and the host and CI run the
+1. Invoke `.devcontainer/fix-ownership.sh` for all configured user-owned setup directories, before any command
+  writes to them. Include the cache and editor mounts and any applicable NuGet configuration or secrets store.
+2. `task dev:setup`, so dependency install and hook registration live in the Taskfile and the host and CI run the
    same path. Its required local configuration provisioning precedes interactive login and dependency restores.
-2. Echo resolved versions of the tools that define the environment. Record them for debugging.
-
-A repo that kept its post-create chown per [Volume ownership](#volume-ownership) does that first.
+3. Echo resolved versions of the tools that define the environment. Record them for debugging.
 
 Keep the script at `.devcontainer/post-create.sh` and invoke it as
-`"postCreateCommand": "bash .devcontainer/post-create.sh"`.
+`"postCreateCommand": "bash .devcontainer/post-create.sh"`, with `"waitFor": "postCreateCommand"`.
+Call ownership repair synchronously inside this script, not as a parallel lifecycle command.
 
 If the repo has no `Taskfile.yml` yet, `task dev:setup` fails on the first build. Say so plainly rather than
 silently substituting a different command.
@@ -425,7 +438,7 @@ silently substituting a different command.
 
 Authoring a new container:
 
-1. `devcontainer.json`, `Dockerfile`, `post-create.sh`, plus `devcontainer-lock.json` once it has been built.
+1. `devcontainer.json`, `Dockerfile`, `post-create.sh`, `fix-ownership.sh`, plus `devcontainer-lock.json` once built.
 2. A short note of every measurement taken, with the command and its result.
 3. An explicit list of what was validated and what was not.
 4. Any unresolved choice stated as a question, never filled with a guess.

@@ -15,28 +15,6 @@ set -euo pipefail
 echo "==> dotfiles: starting install for $(whoami)"
 
 # ---------------------------------------------------------------------------
-# npm / pnpm registry — resolve packages through the supply-chain-screened
-# Microsoft package-feed proxy. This is ENV-SPECIFIC and belongs in your user
-# ~/.npmrc, never in a project repo (a committed registry breaks contributors
-# who can't reach it).
-# ---------------------------------------------------------------------------
-ensure_line() {
-  # ensure_line <file> <line> — append <line> to <file> only if absent.
-  local file="$1" line="$2"
-  mkdir -p "$(dirname "${file}")"
-  touch "${file}"
-  if grep -qxF "${line}" "${file}"; then
-    echo "    ok: '${line}' already in ${file}"
-  else
-    printf '%s\n' "${line}" >>"${file}"
-    echo "    added: '${line}' -> ${file}"
-  fi
-}
-
-echo "==> npmrc: ensuring the package-feed proxy registry"
-ensure_line "${HOME}/.npmrc" "registry=https://packagefeedproxy.microsoft.io/npm/"
-
-# ---------------------------------------------------------------------------
 # Copilot skills — installed under $HOME, which is wiped on every dev container
 # rebuild. Skills authored in this repo are symlinked; third-party skills are
 # real git clones, so do not edit their working trees in place or the next pull
@@ -211,7 +189,7 @@ echo "    ok: remove-fluff ready at ${REMOVE_FLUFF_DIR}"
 
 # ---------------------------------------------------------------------------
 # Add more personal setup below (git config, aliases, shell rc, etc.). Keep each
-# step idempotent — reuse ensure_line for "append if missing" edits.
+# step idempotent.
 # ---------------------------------------------------------------------------
 
 echo "==> dotfiles: install complete"

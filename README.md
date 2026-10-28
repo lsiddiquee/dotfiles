@@ -10,10 +10,6 @@ the install loudly instead of leaving a half-configured environment.
 
 ## What it sets up
 
-- **npm/pnpm registry** — appends the supply-chain-screened Microsoft
-  package-feed proxy to your user `~/.npmrc`. This is intentionally kept in your
-  *personal* environment, never in a project repo, so project builds default to
-  the public npm registry for anyone who can't reach the internal proxy.
 - **Custom Copilot skills** — every directory under [`skills/`](skills/) is
   symlinked into `~/.copilot/skills/`, so editing a skill in this repo takes
   effect immediately; only adding or renaming one needs a re-run. Each directory
@@ -39,8 +35,21 @@ aren't. On Debian/Ubuntu system Pythons `ensurepip` is disabled and
 pip refuses to write to `~/.local`, add `--break-system-packages` to the install
 line.
 
-Extend `install.sh` with more personal setup (git config, aliases, shell rc). Use
-the `ensure_line` helper for "append if missing" edits.
+Extend `install.sh` with more personal setup (git config, aliases, shell rc),
+keeping each step idempotent.
+
+### Package registries
+
+The installer does not configure package registries or modify `~/.npmrc`.
+npm and pnpm consume `NPM_CONFIG_REGISTRY` from their environment; other
+package managers use their own settings, not a universal registry variable.
+With no override, each tool uses its normal configuration and defaults.
+Host variables must still be forwarded into devcontainer builds and runtime
+environments; see the setup-devcontainer skill's feed-forwarding guidance.
+
+Earlier installer versions added a `registry=` entry to `~/.npmrc`. Remove
+that entry manually if it is no longer wanted; this installer leaves existing
+user configuration untouched.
 
 ## Enable it
 
@@ -74,6 +83,5 @@ bash install.sh
 
 ## Security
 
-The registry entry here is a proxy URL, not a secret. **Never** commit auth
-tokens or credentials to this repo — keep it **private**, and store secrets via
+**Never** commit auth tokens or credentials to this repo. Store secrets via
 your environment / secret manager, not in `.npmrc` or any tracked file.

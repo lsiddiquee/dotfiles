@@ -164,9 +164,11 @@ RUN if [ -n "${NUGET_SOURCE}" ]; then \
             > /tmp/nuget-sources; \
         test "$(grep -c '^E ' /tmp/nuget-sources)" -eq 1; \
         rm /tmp/nuget-sources; \
-        chown -R <remoteUser>:<remoteGroup> "$(dirname "$(dirname "$config")")"; \
     fi
 ```
+
+When this root-run step creates the remote user's NuGet configuration directory, include
+`"$HOME/.nuget/NuGet"` in post-create ownership repair; do not change ownership in the Dockerfile.
 
 The source-count check is only a bootstrap check, not proof of effective isolation. Preserve existing configuration,
 package source mappings, and required `auditSources`; inspect effective sources from the workspace and relevant
@@ -204,8 +206,8 @@ For Linux .NET projects using user-secrets, add a dedicated mount at the verifie
 
 Add this entry to existing mounts, not in place of the cache/editor volumes. With Compose, declare the named volume
 and mount it on the devcontainer service instead; do not introduce Compose just for persistence. Do not mount the
-entire home directory. Prepare ownership for the probed remote UID/GID, directory mode `0700`, and a restrictive
-umask when creating secret files. Never put actual credentials in Dockerfile ownership-seeding steps.
+entire home directory. Repair ownership in post-create before provisioning secrets, set directory mode `0700`,
+and use a restrictive umask when creating secret files. Never put actual credentials in Dockerfile steps.
 
 For an existing store, preserve its contents before a first mount can hide them. Provision individual required keys
 with the project's existing setup command; never replace the entire store or erase other project IDs.
@@ -231,21 +233,45 @@ RUN apt-get update \
 
 `fd-find` and `bat` install their binaries as `fdfind` and `batcat`, hence the symlinks.
 
-## Volume ownership seeding
+## Post-create ownership repair
 
-```dockerfile
-RUN mkdir -p /.devcontainercache /home/vscode/.vscode-server \
-    && chown -R vscode:vscode /.devcontainercache /home/vscode/.vscode-server
-```
+Copy [the bundled script](../assets/fix-ownership.sh) to `.devcontainer/fix-ownership.sh`. It derives the owner
+from the calling user's runtime UID/GID, uses non-interactive sudo for a non-root user, and fails if permissions
+cannot be repaired. Run it as the configured `remoteUser`, not through `sudo bash` (which would select root as
+the owner). The selected image must provide passwordless sudo when `remoteUser` is non-root.
 
-The `chown` target must match the probed `remoteUser`.
-
-Where a cache volume already exists and cannot be recreated, the repo keeps its post-create chown instead:
+At the start of `.devcontainer/post-create.sh`, before `task dev:setup`:
 
 ```bash
-if [ "$(id -u)" -ne 0 ]; then SUDO=sudo; else SUDO=""; fi
-$SUDO chown -R "$(id -u):$(id -g)" /.devcontainercache
+#!/usr/bin/env bash
+set -euo pipefail
+
+bash .devcontainer/fix-ownership.sh \
+    /.devcontainercache \
+    "$HOME/.vscode-server"
+task dev:setup
 ```
+
+Pass the actual configured mount targets, adapting the editor path when necessary. Include other user-owned
+setup directories only when used, such as `$HOME/.nuget/NuGet` when build-time NuGet configuration was created.
+For a mounted .NET secrets store, include `$HOME/.microsoft/usersecrets` in the same ownership call and then
+restrict its mode before provisioning any secrets:
+
+```bash
+chmod 0700 "$HOME/.microsoft/usersecrets"
+umask 077
+```
+
+Wire the ordered script and wait for it before normal editor attachment:
+
+```jsonc
+"postCreateCommand": "bash .devcontainer/post-create.sh",
+"waitFor": "postCreateCommand"
+```
+
+Use this path for both fresh and reused volumes; remove corresponding Dockerfile or later-hook ownership changes.
+Never delete volumes to repair ownership. `waitFor` does not defer the server bootstrap itself: validate startup
+with the actual editor as well as CLI lifecycle execution and report failures that precede post-create separately.
 
 ## Workspace mount and volumes
 
