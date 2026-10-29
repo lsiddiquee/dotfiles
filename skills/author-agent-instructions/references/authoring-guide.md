@@ -62,6 +62,7 @@ Each gate definition must name:
 | Choices | Enable the recommendation, customize its terms, or disable this gate; explain each consequence |
 | Waivers and exemptions | Who can waive review, for which scope, and how the waiver is recorded |
 | Decision owner | Where the confirmed policy and individual approvals/waivers live; use real or deliberately created paths |
+| Review-record storage | Ask initially: repo-local ignored `.local/` or a named committed directory; resolve and record the exact workspace-relative path and ignore policy, preserving an established choice |
 | Completion predicate | The Definition of Done check derived from the chosen terms, absent when disabled |
 
 Use the interactive ask-question tool when available, with an explicit-question fallback. Recommend enabling the
@@ -94,6 +95,15 @@ instructions, not exact phrases or Markdown presence:
 | Review-only request with unresolved policies | Report findings and uncertainty without edits or mandatory policy selection |
 | Ambiguous write target among existing instruction files | Resolve ownership before writing; do not create a third file or merge differing policies |
 | Shared-database schema change, any gate choice/waiver | Preserve data through migration unless destructive operations are separately authorized |
+| Model-review tool active | Use the editor review; no duplicate built-in or plain-chat questions while it is active |
+| Initial creation with model review enabled | Resolve ignored `.local/` versus committed review-record storage and exact path with the initial questions; emit the confirmed policy and tool argument |
+| Repeat run with an established storage policy | Retain path and ignored/committed policy without asking again or inventing new confirmation |
+| Storage unanswered or missing in an existing enabled gate | Keep the location pending; ask before a review writes records, never use external editor storage implicitly |
+| Ignored or committed review storage | Verify ignore status; use the same path for editor and chat records; committed choice never authorizes a git commit |
+| Revised editor proposal | Reuse its proposal path and tab; preserve a separate explicit decision for the revised content |
+| Model-review tool inactive but discoverable | Discover once by registered name and use it; absence from the active list alone does not select fallback |
+| Model-review tool missing or discovery unavailable | Present the same details in Markdown; use built-in questions if available, plain chat otherwise; no install requirement or discovery loop |
+| Model review deferred, closed or cancelled | Leave approval pending; do not seek approval again through fallback |
 | Representative future gate | Apply the same question flow, choice recording and matching checks without shipping a speculative gate |
 
 Report which trials were actually performed. A walkthrough review is not an interactive consumer trial; distinguish

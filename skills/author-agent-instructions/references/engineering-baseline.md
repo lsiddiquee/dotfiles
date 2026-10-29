@@ -52,16 +52,36 @@ the same selection contract in the authoring guide, not become mandatory through
 
 **Recommended policy (payload when enabled):**
 
-- Before implementing a new or materially changed domain/persistence model, present entities/aggregates,
-   ownership, relationships, lifecycle states and key invariants. Identify the source of truth and any parallel
-   models, explaining why each is necessary.
+- Before implementing a new or materially changed domain/persistence model, present a structured proposal:
+   entities/aggregates with ownership and source of truth; field tables listing type, meaning, required/optional,
+   stored/derived, mutability, identity/references and constraints; relationship cardinalities; lifecycle states
+   and invariants; non-destructive migration mapping and historical gaps; assumptions and unresolved decisions.
+   Explain why any parallel model is necessary. Distinguish new-record requirements from existing-data handling.
+- Prefer a structured model-review surface when available. If its tool is not active, make one discovery attempt
+   by its registered name when discovery is available, then use it if found; otherwise fall back without retry
+   loops or requiring installation. Choose one question route: keep questions/feedback in the editor while its
+   review is active; only on the fallback route present the same detailed proposal as Markdown and use the
+   built-in question tool when available, or explicit chat questions otherwise. Resolve material questions, incorporate feedback and
+   present the revised scope before separately requesting explicit approval. Do not preselect approval or treat
+   answers/recommendations as consent. Missing review tooling never requires installation or waives the gate;
+   a deferred or cancelled review remains pending rather than triggering another approval request via fallback.
+- Store review records and proposal snapshots in the repository's confirmed workspace-relative directory, with
+   its confirmed ignored or committed policy. Use that location for editor and chat reviews, not external editor
+   storage. If this policy is missing, ask whether to use ignored `.local/model-reviews/` or a named committed
+   directory, resolve the exact path and record the choice before starting review; silence leaves it pending.
+   For Review Model Proposal, pass the recorded directory as `decisionDirectory` alongside `proposalPath`.
+   Record the displayed revision, explicit outcome and feedback/answers; never infer approval. Keep secrets out
+   of records and verify the directory's ignore status matches the policy. Do not stage or commit without
+   authorization. Reuse the same proposal path for revised editor reviews rather than creating a new file each cycle.
 - Obtain explicit user approval of that model before implementation, unless the user explicitly waives the review.
    A general request to implement a feature is not model approval. Gate enablement is not model approval either.
 - Reuse an existing aggregate for the same concept; prefer lifecycle states and workflow-specific validation over
    equivalent duplicate models unless an approved boundary justifies separation.
 - Record the approved model or explicit one-off waiver in the owning design documentation. Record a waiver's scope
    so it cannot silently disable future reviews. Renew approval for material departures from the approved model,
-   not routine implementation details within it. Do not reopen unchanged approved decisions.
+   not routine implementation details within it. Approval covers only the reviewed content and scope, not future
+   revisions. A tool receipt alone does not replace repository design documentation. Do not reopen unchanged
+   approved decisions.
 - Model approval or waiver never authorizes resetting, deleting or reseeding deployed/shared data; obtain separate
    authorization for any destructive operation and otherwise preserve data through migration.
 

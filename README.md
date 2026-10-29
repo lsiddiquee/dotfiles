@@ -17,6 +17,11 @@ the install loudly instead of leaving a half-configured environment.
   [`skills/README.md`](skills/README.md) for the authoring format. This step
   runs *before* the third-party skills below, so a failure there can't stop your
   own skills from being installed.
+- **Model Review extension** - builds and installs the repository-owned VS Code
+  review page when Node 22+, npm and the VS Code CLI are available. It supports the
+  author-agent-instructions model gate without enabling or changing its policy.
+  Missing optional prerequisites leave Markdown/chat review available. See
+  [installation and trial instructions](extensions/model-review/README.md).
 - **`remove-fluff` Copilot skill** — clones
   [iharshulhan/remove-fluff](https://github.com/iharshulhan/remove-fluff) (MIT)
   to `~/.copilot/skills/remove-fluff` and installs its `requirements.txt`
@@ -37,6 +42,16 @@ line.
 
 Extend `install.sh` with more personal setup (git config, aliases, shell rc),
 keeping each step idempotent.
+
+The extension step uses `code` from `PATH`; set `DOTFILES_VSCODE_CLI` to another
+CLI such as `code-insiders` when needed. Set `DOTFILES_MODEL_REVIEW=0` to skip it,
+or `DOTFILES_MODEL_REVIEW=1` to fail when its prerequisites are missing. Available
+prerequisites trigger a locked dependency install, tests, local VSIX packaging
+and installation into that CLI's extension host. Build/install failures abort
+the bootstrap. Unchanged source is skipped when the extension remains installed.
+If the CLI is unavailable during container creation, retry from a VS Code
+terminal with `bash extensions/model-review/install.sh`. Reload VS Code after
+installation, then run **Model Review: Open Example** from the Command Palette.
 
 ### Package registries
 

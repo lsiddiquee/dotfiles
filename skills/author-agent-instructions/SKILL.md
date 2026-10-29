@@ -140,6 +140,55 @@ incomplete for that policy. Record each newly selected policy as a `(confirmed)`
 including its name, enabled/customized/disabled state and the effective terms or a pointer to their owning design
 document. Do not invent a documentation path; use the existing owner or deliberately create and name one.
 
+### 1b. Carry model-review presentation into enabled policies
+
+For enabled model gates, emit the engineering baseline's structured review format and decision scope, not a dense
+summary paragraph. Customized terms remain authoritative; a disabled or pending gate gains no review obligation.
+Choosing a gate policy does not itself require opening a feature-model review.
+
+During initial instruction creation for an enabled gate (or customized terms that retain review records), batch a
+storage question with the initial choices: **Repo-local, ignored records** (`.local/model-reviews/`) or
+**Committed records** (a named directory such as `docs/model-reviews/`). Explain that ignored records stay on this
+checkout; committed records are shared and must not contain secrets. Resolve the exact workspace-relative path,
+reuse an established authoritative choice, and record a new choice with its ignored/committed policy as
+`(confirmed)`. For ignored storage, ensure the chosen directory is git-ignored; for committed storage, verify it
+is not ignored, but do not stage or commit files without authorization. No answer leaves storage pending, not an
+implicit default. Do not silently use VS Code storage or another location outside the repo. Review mode reports a
+missing storage policy without requiring a selection. Emit the resolved path and policy into the generated
+instructions; for the chat fallback, save review records in the same location. Keep approved scope in its owning
+design documentation independently of receipt storage.
+
+The optional **Review Model Proposal** editor tool (`review_model_proposal`, registered as
+`modelReview_reviewModelProposal`) can present fields, relationships, rules, migration and questions. For Copilot
+targets, name it as the preferred presentation when available, never as a prerequisite. Other tools use an
+equivalent review surface or the chat fallback below. Check the active tool list, not whether extension files
+happen to exist on disk. If the editor tool is not active and discovery is available, make one discovery attempt
+for `modelReview_reviewModelProposal` before choosing fallback. Use it if discovered; otherwise use fallback.
+Do not loop on discovery, require installation or open a review merely to probe availability. Generated
+instructions must retain this bounded discovery rule and enough format and approval detail to work without
+this skill or extension.
+
+When using the editor tool for an applicable model change, call it with `{}` to obtain its schema/example, write
+the proposal JSON inside the workspace, then call with
+`{"proposalPath":"<workspace-relative-path>.json","decisionDirectory":"<confirmed-workspace-relative-directory>"}`.
+If the storage policy is unresolved, ask before starting the review rather than inventing a directory. Revise the
+same proposal file for the next cycle so the editor can reuse its review tab; a separate proposal file is a
+separate review.
+Keep questions and feedback in that editor review; do not also ask them through the built-in question tool or
+chat while it is active. Wait for its result. Incorporate returned feedback/answers into a revised proposal and
+review again. Only an
+explicit `approved` result for the current content approves that scope; `changes_requested`, `deferred`, closing,
+cancellation, errors and tool-execution permission do not. Example decisions never approve real changes. Record
+the approved scope in the owning design documentation; the tool's local receipt is not a substitute. If the tool
+is unavailable or cannot represent the confirmed custom terms, present the same detailed proposal in chat using
+Markdown field tables, relationship/cardinality descriptions, rules and migration impact. Use the built-in
+ask-question tool only on this fallback route for unresolved decisions when available; otherwise ask explicit
+chat questions. Choose one question route for the review, not both editor and chat. Incorporate
+the answers, present the revised scope, then ask separately for explicit approval; do not preselect approval or
+treat question answers as consent. Keep unresolved or skipped answers pending. A deferred, closed or cancelled
+editor review stays pending, not an invitation to seek approval again through fallback. Do not interpret fallback
+as a waiver or alter the selected gate policy.
+
 ### 2. Draft against the skeleton
 
 Use this order. Each row owns a disjoint slice; if a fact fits two rows, the earlier row wins. Drop a section only

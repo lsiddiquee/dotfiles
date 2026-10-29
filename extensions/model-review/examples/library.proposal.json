@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "title": "Library copies and loan history",
+  "summary": "Separate shared catalog metadata from physical copies, with a retained borrowing history for each copy.",
+  "models": [
+    {
+      "name": "Book", "description": "A catalog title. Physical copies share this metadata.",
+      "fields": [
+        { "name": "id", "type": "Identifier", "required": true, "description": "Catalog identity; preserve existing identifiers where possible.", "storage": "stored", "mutability": "Immutable", "constraints": ["Unique"] },
+        { "name": "title", "type": "Text", "required": true, "description": "The catalog title.", "storage": "stored", "mutability": "Editable", "constraints": ["Non-empty"] }
+      ]
+    },
+    {
+      "name": "Copy", "description": "One physical copy of a Book. Physical identity and loan evidence belong here, not on the shared title.",
+      "fields": [
+        { "name": "id", "type": "Identifier", "required": true, "description": "Physical copy identity.", "storage": "stored", "mutability": "Immutable", "constraints": ["Unique"] },
+        { "name": "bookId", "type": "Book reference", "required": true, "description": "The shared catalog title for this copy.", "storage": "stored", "mutability": "Correction policy unresolved", "constraints": ["References an existing Book"] },
+        { "name": "code", "type": "Text", "required": true, "description": "Automatically assigned permanent label.", "storage": "stored", "mutability": "Immutable", "constraints": ["Unique", "Uniqueness does not require gap-free numbering"] },
+        { "name": "availability", "type": "Available | On loan", "required": true, "description": "Computed from whether an active Loan exists.", "storage": "derived", "mutability": "Recomputed, never independently edited", "constraints": ["At most one active Loan"] }
+      ]
+    },
+    {
+      "name": "Loan", "description": "One borrowing event for one physical Copy; completed events form its history.",
+      "fields": [
+        { "name": "id", "type": "Identifier", "required": true, "description": "Borrowing event identity.", "storage": "stored", "mutability": "Immutable", "constraints": ["Unique"] },
+        { "name": "copyId", "type": "Copy reference", "required": true, "description": "The exact physical copy borrowed.", "storage": "stored", "mutability": "Immutable after checkout", "constraints": ["References an existing Copy"] },
+        { "name": "borrowerName", "type": "Text", "required": true, "description": "Borrower name recorded at checkout. Proposed requirement for new loans only.", "storage": "stored", "mutability": "Correction policy unresolved", "constraints": ["Historical missing values remain unrecorded"] },
+        { "name": "borrowerReference", "type": "Text", "required": false, "description": "Optional borrower reference; absence means unrecorded.", "storage": "stored", "mutability": "Correction policy unresolved", "constraints": [] },
+        { "name": "checkedOutAt", "type": "Timestamp", "required": true, "description": "Time the copy was lent; required for new loans.", "storage": "stored", "mutability": "Immutable after checkout", "constraints": ["Preserve historical gaps rather than invent times"] },
+        { "name": "dueAt", "type": "Timestamp", "required": true, "description": "Proposed required return deadline for new loans.", "storage": "stored", "mutability": "Renewal policy unresolved", "constraints": ["Not before checkout"] },
+        { "name": "returnedAt", "type": "Timestamp", "required": false, "description": "Absent while active; set when returning the copy.", "storage": "stored", "mutability": "Set on return, then immutable", "constraints": ["Not before checkout"] },
+        { "name": "checkoutConditionNotes", "type": "Text", "required": false, "description": "Condition recorded at checkout; missing means unrecorded.", "storage": "stored", "mutability": "Correction policy unresolved", "constraints": [] },
+        { "name": "returnConditionNotes", "type": "Text", "required": false, "description": "Condition recorded on return; missing means unrecorded.", "storage": "stored", "mutability": "Set on return, then immutable", "constraints": [] }
+      ]
+    }
+  ],
+  "relationships": [
+    { "from": "Book", "to": "Copy", "cardinality": "one-to-zero-or-many", "description": "Each Copy belongs to exactly one Book. Whether a Book may have no copies is proposed, not confirmed." },
+    { "from": "Copy", "to": "Loan", "cardinality": "one-to-zero-or-many", "description": "Each Loan belongs to exactly one Copy. A Copy may have many completed Loans but at most one active Loan." }
+  ],
+  "lifecycle": ["Adding a Copy assigns a permanent unique code.", "Checkout creates an active Loan; return completes it.", "Completed Loans are immutable under the proposed policy; correction handling remains unresolved."],
+  "invariants": ["Enforce one active Loan per Copy atomically when saving, not only in the UI.", "Copies and loan history cannot be deleted through the app."],
+  "migration": ["Each existing book entry gains one Copy, and its existing Loans attach to that Copy.", "Do not merge possibly duplicated titles without review.", "Preserve identifiers and historical gaps. No reset, deletion or reseeding is authorized."],
+  "assumptions": ["The listed fields are conceptual proposals, not storage-specific column definitions.", "New-loan requirements do not imply fabricating missing historical values."],
+  "questions": [
+    { "id": "emptyBook", "prompt": "Can a Book exist before any copies are added?", "options": ["Yes", "No"], "recommended": "Yes" },
+    { "id": "requiredFields", "prompt": "Must new loans include borrower name and due date?", "options": ["Both required", "Customize"], "recommended": "Both required" },
+    { "id": "corrections", "prompt": "How should incorrect completed loans be corrected while retaining history?" },
+    { "id": "retirement", "prompt": "How should lost or damaged copies be retired, and can active loans be renewed?" }
+  ]
+}

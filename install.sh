@@ -134,6 +134,8 @@ else
   shopt -u nullglob
 fi
 
+bash "${DOTFILES_DIR}/extensions/model-review/install.sh"
+
 # ---------------------------------------------------------------------------
 # Third-party Copilot skills.
 # ---------------------------------------------------------------------------

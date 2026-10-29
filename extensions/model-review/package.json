@@ -1,0 +1,86 @@
+{
+  "name": "model-review",
+  "displayName": "Model Review",
+  "description": "Review agent-proposed models, fields and relationships before implementation.",
+  "version": "0.1.3",
+  "publisher": "lsiddiquee",
+  "private": true,
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lsiddiquee/dotfiles.git",
+    "directory": "extensions/model-review"
+  },
+  "engines": {
+    "vscode": "^1.100.0",
+    "node": ">=22"
+  },
+  "categories": [
+    "Other"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "main": "./dist/extension.cjs",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "modelReview.openDemo",
+        "title": "Model Review: Open Example"
+      },
+      {
+        "command": "modelReview.openProposal",
+        "title": "Model Review: Open Proposal"
+      }
+    ],
+    "languageModelTools": [
+      {
+        "name": "modelReview_reviewModelProposal",
+        "toolReferenceName": "review_model_proposal",
+        "displayName": "Review Model Proposal",
+        "canBeReferencedInPrompt": true,
+        "modelDescription": "Review a domain/persistence model before implementation. First call with {} to obtain the JSON Schema and example (no approval UI). Resolve receipt storage from repository policy or ask the user: ignored repo-local .local/ or a named committed directory. Then write a proposal JSON inside the workspace and call with proposalPath and decisionDirectory, both workspace-relative paths; decisionDirectory must be the confirmed receipt directory, never inferred. This opens an editor review page and waits for the user's explicit decision. Revise the same proposal file to reuse the review tab. Returns approved, changes_requested or deferred with content hash, feedback and answers. Approval covers only this revision and never authorizes destructive data operations. Incorporate answers into a revised proposal before approval; unresolved questions block it. Cancellation, closing the page and failures never approve. Do not implement while waiting or after a deferred/changes_requested result. Preserve the repository's enabled/customized/disabled gate policy; never treat opening the tool or tool-execution permission as model approval.",
+        "userDescription": "Review model fields, relationships and migration rules in an editor page.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "proposalPath": {
+              "type": "string",
+              "description": "Existing JSON proposal path relative to the single workspace folder. Omit to obtain the schema and example."
+            },
+            "decisionDirectory": {
+              "type": "string",
+              "description": "Required with proposalPath: the repository's explicitly confirmed workspace-relative receipt directory, either git-ignored .local/ storage or a named committed directory. Ask if policy is unresolved; never invent a default."
+            }
+          }
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "test": "npm run build && node --test --test-timeout=10000 test/*.test.mjs",
+    "build": "node build.mjs",
+    "package": "vsce package --no-dependencies --skip-license --out model-review.vsix",
+    "vscode:prepublish": "npm run build",
+    "test:ui": "npm run build && playwright test"
+  },
+  "dependencies": {
+    "dompurify": "^3.2.6",
+    "lucide-react": "^0.468.0",
+    "mermaid": "^11.4.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.51.0",
+    "@vscode/vsce": "^4.0.0",
+    "esbuild": "^0.25.0"
+  }
+}
