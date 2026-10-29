@@ -30,8 +30,7 @@ State that the redundancy is deliberate.
 ## Language and domain: include without duplicating
 
 If inventory finds a real stack or domain, the harness must make agents obey it. Silence is wrong: an agent will
-invent style, layout, or domain shortcuts. Duplication is also wrong: copied rule lists drift from the linter. This
-is the only home for that rule; section guidance below applies it rather than restating it.
+invent style, layout, or domain shortcuts. Duplication is also wrong: copied rule lists drift from the linter.
 
 | Do | Do not |
 | -- | ------ |

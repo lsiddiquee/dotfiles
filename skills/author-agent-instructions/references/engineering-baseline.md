@@ -95,6 +95,30 @@ the same selection contract in the authoring guide, not become mandatory through
   review's job. Genuine shared functions may have behaviour-focused unit tests; do not extract helpers merely to
    justify tests. This exception does not waive application behaviour tests.
 - While iterating, run the narrowest check that proves the point, not the whole suite by default.
+- **Agent-owned Bash terminal sessions only:** run checks in a conditional and capture the original numeric
+   status immediately, so ordinary failure cannot skip reporting. Show relevant diagnostics without secrets or
+   sensitive payloads, then echo the check name, PASS/FAIL and original command exit code. Immediately follow the
+   successful echo with plain `exit`, not `exit "$command_status"`; avoid strict-mode or chained-command exits
+   that bypass reporting. Use this pattern with the actual check:
+
+   ```bash
+   if some_check; then
+      command_status=0
+      outcome=PASS
+   else
+      command_status=$?
+      outcome=FAIL
+   fi
+   echo "some_check: ${outcome}; command_exit=${command_status}"
+   exit
+   ```
+
+   The terminal's normal exit is not evidence that the check passed: a printed nonzero command code is a failed
+   check. Label expected TDD red runs explicitly and continue the repair/test loop; never report them as passing.
+   Do not deliberately fail the terminal process or create synthetic nonzero-terminal probes to validate this
+   convention. Do not change native exit-status propagation in CI, hooks, repository scripts or callers that
+   depend on it; wrap their invocation only in the agent-owned session. Never weaken a quality gate or disable
+   editor notifications to avoid a popup.
 - **Never delete or weaken a test to make a change pass.**
 - Cover failure paths, not only the happy path.
 - Coverage thresholds are earned by behaviour tests, never by padding.
@@ -167,4 +191,3 @@ Rules to write into the generated file:
    - to the instruction file when it changes future agent behaviour
    - to human docs when a person needs it to work here
 6. Leave an entry in `patterns.md` only while it may not generalise.
-7. If rediscovering it would cost someone a morning, it belongs in git.

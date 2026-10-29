@@ -106,7 +106,7 @@ While inventorying language/domain, build two lists:
 The generated file must cover both: enforced items by pointer, unenforced items by short prescription. Do not leave
 an attested language or domain out of the file entirely.
 
-**An empty inventory is an answer.** Whatever the inventory did not turn up is not a verified fact. A near-empty
+Whatever the inventory did not turn up is not a verified fact. A near-empty
 repo may still attest to something real, such as a dev container image implying an interpreter. Point at that file.
 Do not invent commands, test layout, commit format, language, or domain.
 
@@ -252,6 +252,12 @@ evidence/confirmation or remove the rule.
   without guessing where state goes, and without resolving ambiguity between two rules.
 - **Stack coverage:** attested languages, toolchains, and domains are named and reachable through their configs;
   Commands and Definition of Done still require the real check commands.
+- **Terminal reporting:** agent-owned Bash sessions conditionally capture the original numeric command status,
+  show safe diagnostics and echo the check name, PASS/FAIL and original code, immediately followed by plain
+  `exit`. A normal terminal exit never makes a nonzero command result pass; expected TDD red runs are labeled
+  and followed by repair/retest. No contradictory strict-mode, chained-command or `exit "$status"` rule may
+  bypass reporting or fail the terminal deliberately. CI, hooks and repository-script exit contracts remain
+  native. Validation must not create synthetic nonzero-terminal probes or disable editor notifications.
 - Concrete scratch paths and the full task-state lifecycle are present.
 - Every configurable gate has a verified binding or confirmed policy, or is reported pending; no recommendation was mistaken for
   consent. Enabled/customized gate rules and Definition of Done agree; disabled gates leave no indirect approval
@@ -322,9 +328,3 @@ Quality of the generated file is defined by step 5; this contract covers what th
 4. For writes, report target path(s), verified stack/domain pointers, baseline applied, overrides recorded,
   inherited binding policies, enabled/customized/disabled gate choices, and anything pending confirmation.
   Do not report a pending gate as resolved or an inherited policy as newly confirmed.
-
-## Retention criteria
-
-Apply the three content categories when deciding what to retain: cut description that duplicates a source of truth,
-keep baseline rules without another owner, keep verified facts that change agent decisions, and omit unconfirmed
-guesses.
