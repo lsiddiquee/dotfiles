@@ -90,11 +90,11 @@ the same selection contract in the authoring guide, not become mandatory through
 - **Standalone scripts and declarative text** (configuration, pipeline/task wiring, prompts, response schemas, docs):
   do not create tests that copy a value, sentence or structure from a file and assert it is still there. Run scripts
   in the intended environment and check outcomes/exit status; validate configuration with its tooling and consuming
-  system; prove prompt and schema behaviour with a trial run or evaluation harness against the real consumer. Syntax
+   system; prove prompt and schema behaviour with a trial run or evaluation suite against the real consumer. Syntax
   checks are supplementary, not proof of runtime correctness. Report execution not performed. Accidental omission is
   review's job. Genuine shared functions may have behaviour-focused unit tests; do not extract helpers merely to
    justify tests. This exception does not waive application behaviour tests.
-- While iterating, run the narrowest check that proves the point, not the whole suite by default.
+- While iterating, run the narrowest check that proves the point. Do not default to the whole suite.
 - **Agent-owned Bash terminal sessions only:** run checks in a conditional and capture the original numeric
    status immediately, so ordinary failure cannot skip reporting. Show relevant diagnostics without secrets or
    sensitive payloads, then echo the check name, PASS/FAIL and original command exit code. Immediately follow the
@@ -120,7 +120,7 @@ the same selection contract in the authoring guide, not become mandatory through
    depend on it; wrap their invocation only in the agent-owned session. Never weaken a quality gate or disable
    editor notifications to avoid a popup.
 - **Never delete or weaken a test to make a change pass.**
-- Cover failure paths, not only the happy path.
+- Cover success and failure paths.
 - Coverage thresholds are earned by behaviour tests, never by padding.
 - When the repo has a known test command, name the narrow and full forms under Commands or Testing.
 
@@ -173,7 +173,7 @@ Rules to write into the generated file:
 3. Checkpoint before focus changes, deep dives, long/branching operations, and after meaningful findings. Re-read on
    resume.
 4. When live state exceeds roughly 200 lines or collects several finished blocks, move completed sections to
-   `task-state-completed.md` (newest first). Do this when bloat appears, not only when asked.
+   `task-state-completed.md` (newest first). Do this when bloat appears; do not wait to be asked.
 5. When the task is closed: promote anything durable, then delete `task-state.md` and
    `task-state-completed.md`, or leave them empty. Do not keep stale task state as if it were current.
 6. Ensure `.local/` is git-ignored when this baseline is applied. If `.gitignore` cannot be changed in the same work,

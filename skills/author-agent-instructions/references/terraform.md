@@ -5,7 +5,7 @@ verbatim into the generated instruction file.
 
 When Terraform infrastructure is set up, use `infra/environments/<environment>/` for environment-specific inputs,
 for example `infra/environments/dev/` under the repository root. Each environment has `backend.tfvars` for remote
-state configuration and `terraform.tfvars` for deployment inputs. This is a confirmed convention, not a claim that
+state configuration and `terraform.tfvars` for deployment inputs. This is a confirmed convention. Do not infer that
 infrastructure already exists. Do not create infrastructure while merely authoring instructions. If setup is still
 pending, record the future layout under Repo conventions with `(confirmed)`; once implemented, point at the actual
 files. Preserve an existing conflicting layout unless the user authorizes migration.
@@ -28,7 +28,7 @@ It is backend configuration, not root-module variable input.
 
 ## Deployment inputs
 
-The following `terraform.tfvars` is illustrative, not a required variable schema or a verified model catalogue.
+The following `terraform.tfvars` is illustrative. Do not treat it as a required variable schema or a verified model catalogue.
 Include only variables declared by the project. Choose a unique prefix, verify subscription quota, model/version
 availability and supported regions, and obtain the real principal IDs before deployment. Replace image placeholders
 with immutable Git-SHA tags or digests. Do not copy these project-specific values into unrelated repositories.
@@ -60,7 +60,7 @@ operator_resource_ip_allowlist = ["203.0.113.10"]
 ```
 
 Keep both files free of secrets: Azure AD authenticates the backend; application secrets belong in the project's
-secret store, not variable files. Public client IDs, principal IDs and resource names are configuration, not secrets.
+secret store, not variable files. Public client IDs, principal IDs and resource names are non-secret configuration.
 Do not treat the example IP as a usable workstation address.
 
 ## Environment selection
@@ -79,4 +79,4 @@ Use separate Terraform working/data directories per environment to avoid reusing
 backend; do not automatically migrate state when changing environments.
 
 In generated instructions, keep only the layout, file roles, safe environment selection and real command pointers.
-Do not reproduce these sample values or entire variable files in the always-on harness.
+Do not reproduce these sample values or entire variable files in the always-on instruction file.

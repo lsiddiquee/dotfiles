@@ -19,7 +19,7 @@ Fails:
 
 Passes:
 
-- **Prescription, not description.** "Never weaken a test to make a change pass" does not go stale. "`select` is E,
+- **Prescriptive rules.** "Never weaken a test to make a change pass" does not go stale. "`select` is E,
   F, I" goes stale when the config changes.
 - **Nothing enforces it.** Silent drift, layout conventions, confusing tool failures.
 - **The feedback loop is slow.** A rule checked only after push or PR review is worth a line.
@@ -29,8 +29,8 @@ State that the redundancy is deliberate.
 
 ## Language and domain: include without duplicating
 
-If inventory finds a real stack or domain, the harness must make agents obey it. Silence is wrong: an agent will
-invent style, layout, or domain shortcuts. Duplication is also wrong: copied rule lists drift from the linter.
+When inventory identifies a stack or domain, require agents to follow its verified rules. Do not invent
+conventions or copy rule lists from configuration that already owns them.
 
 | Do | Do not |
 | -- | ------ |
@@ -50,7 +50,7 @@ the file says the redundancy is deliberate.
 Every configurable approval gate added to this skill or its payload must use this contract. A new approval
 obligation is a gate even if phrased as a baseline rule or checklist item. Do not silently add mandatory gates, or
 make existing safety requirements optional by relabeling them. Gate selection is authoring process; generated
-repository instructions contain the resolved policy, not the skill's question-tool workflow.
+repository instructions contain the resolved policy. Do not copy the skill's question-tool workflow.
 
 Each gate definition must name:
 
@@ -68,7 +68,7 @@ Use the interactive ask-question tool when available, with an explicit-question 
 documented policy, but never treat a default, silence or a skipped answer as consent. Batch initial gate choices
 with other questions. For Customize, offer the recommended terms as defaults and ask only for unresolved trigger,
 review content, approver, waivers/exemptions, recording and reapproval details. A focused follow-up is allowed;
-unresolved terms stay pending, not guessed.
+unresolved terms stay pending; do not guess them.
 
 Persist each newly selected policy as a named `(confirmed)` decision: enabled, customized with effective terms, or
 disabled. Keep policy choice distinct from approval or a scoped waiver for a particular change. Preserve confirmed
@@ -105,7 +105,7 @@ instructions, not exact phrases or Markdown presence:
 | Model review deferred, closed or cancelled | Leave approval pending; do not seek approval again through fallback |
 | Representative future gate | Apply the same question flow, choice recording and matching checks without shipping a speculative gate |
 
-Report which trials were actually performed. A walkthrough review is not an interactive consumer trial; distinguish
+Report which trials were performed. A walkthrough review is not an interactive consumer trial; distinguish
 the two and disclose any unexecuted question-tool or generation behavior.
 
 ### Intro

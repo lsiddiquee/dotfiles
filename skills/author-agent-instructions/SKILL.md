@@ -18,7 +18,7 @@ or the repo already has a canonical file (`AGENTS.md`, `CLAUDE.md`, `.github/cop
 use that. Prefer one always-on file unless the user asks for more. When generating for more than one tool, keep the
 same substance; only the filename (and any tool-required frontmatter) should differ.
 
-The generated file is a harness. It must be clear for both audiences, and **processable by ordinary LLMs** without
+The generated instructions must be clear for both audiences and **processable by ordinary LLMs** without
 repo-specific tribal knowledge:
 
 | Audience | Needs |
@@ -38,7 +38,7 @@ references in full at the following points; do not treat their payload or guidan
 | --------- | ------------ | ----------------- |
 | [Engineering baseline](./references/engineering-baseline.md) | Before drafting or reviewing any instruction file | **Payload:** emit applicable baseline sections; emit configurable gates only under their confirmed policy |
 | [Authoring guide](./references/authoring-guide.md) | Before drafting, trimming or reviewing any instruction file | **Process/guidance:** line economy, stack coverage, repo-shaped sections and anti-patterns; never copy verbatim |
-| [Terraform guidance](./references/terraform.md) | When inventory finds Terraform or infrastructure setup is planned | **Guidance:** confirmed environment layout, examples and safe command selection; do not reproduce samples in the harness |
+| [Terraform guidance](./references/terraform.md) | When inventory finds Terraform or infrastructure setup is planned | **Guidance:** confirmed environment layout, examples and safe command selection; do not reproduce samples in the instruction file |
 
 The payload deliberately restates some process ideas. That is not duplication to cut. Generated instructions must
 stand alone: emit the required substance, not links to these skill references that future agents may not have.
@@ -50,7 +50,7 @@ Every line in the generated file is exactly one of:
 | Kind | Meaning | When to write it |
 | ---- | ------- | ---------------- |
 | **Verified fact** | Attested by the repository right now | After inventory confirms it |
-| **Baseline rule** | From this skill's default engineering harness | Always, unless the user overrides it |
+| **Baseline rule** | From this skill's default engineering baseline | Always, unless the user overrides it |
 | **Confirmed decision** | A choice the repo does not encode yet | Only after the user confirms, or omit the section |
 
 Never present a guess as a verified fact. Never present an unconfirmed repo-specific convention as a baseline rule.
@@ -90,7 +90,7 @@ Read; do not recall. Open what exists:
 - Hooks and CI (what they run is the enforcement map)
 - Test config: what is collected, what is excluded
 - **Domain signals:** package names, service boundaries, data/compliance docs, ADR/architecture notes that constrain
-  implementation — only what is actually present
+  implementation; include only what is present
 - Directory layout as it is
 - Existing instruction files, README, contrib docs
 - `.gitignore` and any existing scratch/working directory convention
@@ -100,8 +100,8 @@ Never state a tool default from memory. Measure it.
 
 While inventorying language/domain, build two lists:
 
-1. **Enforced** — checked by linter, formatter, type-checker, tests, hooks, or CI.
-2. **Unenforced** — real conventions or domain invariants with no checker.
+1. **Enforced**: checked by linter, formatter, type-checker, tests, hooks, or CI.
+2. **Unenforced**: real conventions or domain invariants with no checker.
 
 The generated file must cover both: enforced items by pointer, unenforced items by short prescription. Do not leave
 an attested language or domain out of the file entirely.
@@ -142,8 +142,8 @@ document. Do not invent a documentation path; use the existing owner or delibera
 
 ### 1b. Carry model-review presentation into enabled policies
 
-For enabled model gates, emit the engineering baseline's structured review format and decision scope, not a dense
-summary paragraph. Customized terms remain authoritative; a disabled or pending gate gains no review obligation.
+For enabled model gates, emit the engineering baseline's structured review format and decision scope. Do not
+replace it with a dense summary paragraph. Customized terms remain authoritative; a disabled or pending gate gains no review obligation.
 Choosing a gate policy does not itself require opening a feature-model review.
 
 During initial instruction creation for an enabled gate (or customized terms that retain review records), batch a
@@ -152,8 +152,8 @@ storage question with the initial choices: **Repo-local, ignored records** (`.lo
 checkout; committed records are shared and must not contain secrets. Resolve the exact workspace-relative path,
 reuse an established authoritative choice, and record a new choice with its ignored/committed policy as
 `(confirmed)`. For ignored storage, ensure the chosen directory is git-ignored; for committed storage, verify it
-is not ignored, but do not stage or commit files without authorization. No answer leaves storage pending, not an
-implicit default. Do not silently use VS Code storage or another location outside the repo. Review mode reports a
+is not ignored, but do not stage or commit files without authorization. No answer leaves storage pending; do not
+assume a default. Do not silently use VS Code storage or another location outside the repo. Review mode reports a
 missing storage policy without requiring a selection. Emit the resolved path and policy into the generated
 instructions; for the chat fallback, save review records in the same location. Keep approved scope in its owning
 design documentation independently of receipt storage.
@@ -186,7 +186,7 @@ ask-question tool only on this fallback route for unresolved decisions when avai
 chat questions. Choose one question route for the review, not both editor and chat. Incorporate
 the answers, present the revised scope, then ask separately for explicit approval; do not preselect approval or
 treat question answers as consent. Keep unresolved or skipped answers pending. A deferred, closed or cancelled
-editor review stays pending, not an invitation to seek approval again through fallback. Do not interpret fallback
+editor review stays pending; do not seek approval again through fallback. Do not interpret fallback
 as a waiver or alter the selected gate policy.
 
 ### 2. Draft against the skeleton
@@ -201,7 +201,7 @@ when it would be empty after applying the content rules below.
 | Commands | Verified fact | Daily commands including lint/format/typecheck/test entrypoints |
 | Single source of truth | Verified fact | What defines "passing"; which configs own style, types, and analysis; "do not bypass" |
 | Engineering discipline | Baseline + verified + confirmed | Required baseline, inherited binding policies and newly confirmed gate choices; no new unconfirmed obligations |
-| Testing | Baseline + verified | Default harness, plus how to run the narrow case when known |
+| Testing | Baseline + verified | Default testing rules, plus how to run the narrow case when known |
 | Commits | Verified or confirmed | Message/PR rules only if attested or confirmed |
 | Repo conventions | Verified or confirmed | Layout and domain invariants that nothing checks for you |
 | Documentation ownership | Verified + baseline | Which file owns what; update docs in the same change |
@@ -225,15 +225,15 @@ Delete:
 - rationale that belongs as a comment in the config file
 
 Point at the source of truth instead. After cutting, the file must still **require** agents to run and satisfy those
-tools — cutting means remove the mirror, not remove the obligation.
+tools; cutting means remove the mirror, not remove the obligation.
 
 ### 4. Verify and classify
 
 For each remaining line:
 
-1. **Verified fact** — find it in the repo, or delete it. Do not soften into "generally uses X".
-2. **Baseline rule** — keep the substance from this skill; adapt names to the repo when needed.
-3. **Confirmed decision** — keep only if confirmed. Otherwise omit the section or ask.
+1. **Verified fact**: find it in the repo, or delete it. Do not soften into "generally uses X".
+2. **Baseline rule**: keep the substance from this skill; adapt names to the repo when needed.
+3. **Confirmed decision**: keep only if confirmed. Otherwise omit the section or ask.
 
 Watch for the tell: a rule that cites "the required format" when the file never defines one. Either define it from
 evidence/confirmation or remove the rule.
@@ -241,7 +241,7 @@ evidence/confirmation or remove the rule.
 ### 5. Self-check the generated file
 
 - One home per rule **across files**: never mirror a rule that a config, hook, or CI job already owns. Restating a
-  rule inside the generated file is allowed when the restatement changes mood — Definition of Done turns working
+  rule inside the generated file is allowed when the restatement changes mood: Definition of Done turns working
   rules into verifiable predicates.
 - Constraints before procedures; checklist near the end.
 - Every path and named format is real, or is deliberately created by the baseline and marked as such. No line cites
@@ -268,7 +268,7 @@ evidence/confirmation or remove the rule.
   gate-selection contract and behavioral trials. Reject additions that silently impose a gate through payload,
   review guidance or a checklist; do not reclassify existing safety requirements as optional.
 - No stack or domain invention beyond inventory.
-- No tool-locked wording unless the file is truly tool-specific ("in the Copilot chat panel…"). Rules should read as
+- No tool-locked wording unless the file is tool-specific ("in the Copilot chat panel…"). Rules should read as
   repository law, not product UI help.
 
 ## Asking the user
@@ -300,8 +300,7 @@ use the required non-gate baseline payload. Configurable gates always follow ste
 
 ## Working from `/init` or an existing file
 
-Generators are useful for inventory and little else. Their output is usually description-heavy and baseline-poor:
-they can see config, not engineering harness preferences.
+Use generator output for inventory; it may repeat configuration and omit baseline requirements.
 
 Process:
 
@@ -312,7 +311,7 @@ Process:
 5. Verify every repo-shaped claim.
 6. Ask for residue; do not invent it.
 
-A short existing file is not proof of discipline. It may simply be missing harness rules. Judge by what an agent
+A short existing file is not proof of discipline. It may be missing baseline rules. Judge by what an agent
 would do differently when a missing rule is supplied.
 
 When reviewing, check wrong claims before style, then missing baseline sections, then absent repo-shaped sections.
